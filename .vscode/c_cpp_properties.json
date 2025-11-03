@@ -1,0 +1,31 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${ROOT}/include/**",
+                "${CLAS12ROOT}/Clas12Banks/**",
+                "${CLAS12ROOT}/Clas12Root/**",
+                "${CLAS12ROOT}/iguana/**",
+                "${HIPO}/include/**",
+                "${IGUANA}/include/**"
+                ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c23",
+            "cppStandard": "gnu++23",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "env": {
+        "CLAS12ROOT":"/opt/CLAS/ROOT/repo",
+        "ROOT":"/opt/CERN_ROOT_6.36/install",
+        "RCDB_HOME":"/opt/CLAS/RCDB",
+        "CCDB_HOME":"/opt/CLAS/CCDB",
+        "QADB":"/opt/CLAS/ROOT/repo/clas12-qadb",
+        "HIPO":"/opt/CLAS/HIPO/install",
+        "IGUANA":"/opt/CLAS/IGUANA/install"
+    },
+    "version": 4
+}
