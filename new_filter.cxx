@@ -54,27 +54,25 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
   int events = numEvents!=-1?numEvents:c12_reader.getReader().getEntries();
   // dict.show(); // Print all bank names
 
+
+  //////////////////////////////////////////////////////////////////////////////
+  // // QADB
   // clas12::clas12databases db;
   // c12_reader.connectDataBases(&db);
   // c12_reader.applyQA("pass2");
   // c12_reader.db()->qadb_requireOkForAsymmetry(true); // what is this? Is this needed in general or specific for every ana task?
 
-  // // Prepare Filters
+  //////////////////////////////////////////////////////////////////////////////
+  // // Prepare Iguana Filters
   // clas12root::Iguana ig{};
   // ig.GetTransformers().Use("clas12::MomentumCorrection");
   // ig.GetFilters().Use("clas12::zVertexFilter");
   // ig.GetCreators().Use("physics::InclusiveKinematics");
   // ig.SetOptionAll("log", "debug");
   // // ig.Start();
-
-  // std::vector<clas12::region_part_ptr> electron = c12_reader.getByID(PDG::electron);
-  // std::vector<clas12::region_part_ptr> pi_m = c12_reader.getByID(PDG::pi_minus);
-  // std::vector<clas12::region_part_ptr> pi_p = c12_reader.getByID(PDG::pi_plus);
-
   
   //////////////////////////////////////////////////////////////////////////////
   // // PREPARE OUTPUT
-  //////////////////////////////////////////////////////////////////////////////
   std::unique_ptr<ROOT::RNTupleModel> model = ROOT::RNTupleModel::Create();
   // create fields
   // default fields (always present)
@@ -102,9 +100,12 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
   while (c12_reader.next() && ((events != -1 && count < events) || (events == -1 )))
   {
     // body
+    // access variant stored in map with std::get<> and dereference the shared_ptr to set the that it holds.
     *std::get<std::shared_ptr<int>>(map["eventNumber"])=c12_reader.runconfig()->getEvent();
     *std::get<std::shared_ptr<double>>(map["helicity"])=c12_reader.event()->getHelicity();
     *std::get<std::shared_ptr<double>>(map["beam_charge"])=c12_reader.event()->getBeamCharge();
+    // tell the RNTupleWriter that the values of the pointers stored in 
+    // the fields of the model have changed and to write them to disk
     file->Fill();
 
     // progress update
@@ -116,12 +117,20 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
   }
 
   file.reset(); // close file, ~RNTupleWriter() writes to disk on destruction
+
+  // RNTupleWriter does not write the Tree structure to disk.
+  // Work around this using tempfile and RDataFrame.Snapshot, which does.
   ROOT::RDataFrame df = ROOT::RDF::FromRNTuple("nTupleName",tempfile.c_str());
   df.Display()->Print();
-  df.Snapshot("IamGroot", outputfile);
+  df.Snapshot("out_tree", outputfile);
+  std::remove(tempfile.c_str()); // Delete the temporary file
   
-  std::remove(tempfile.c_str());
   std::cout << std::endl<<"done."<<std::endl;
+
+
+  //////////////////////////////////////////////////////////////////////////////
+  // // Stale code
+  // // Keep for now as reference
 
   // iguana::AlgorithmSequence seq;
   // seq.Add<iguana::clas12::EventBuilderFilter>("pid_filter"); // Filter for PIDs from EventBuilder
