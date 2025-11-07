@@ -102,20 +102,11 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
   while (c12_reader.next() && ((events != -1 && count < events) || (events == -1 )))
   {
     // body
-    std::visit([](auto&& arg){}, map["eventNumber"]);
-    //  
-
-  
-    // auto p=std::get_if<double>(map["eventNumber"])
     *std::get<std::shared_ptr<int>>(map["eventNumber"])=c12_reader.runconfig()->getEvent();
     *std::get<std::shared_ptr<double>>(map["helicity"])=c12_reader.event()->getHelicity();
     *std::get<std::shared_ptr<double>>(map["beam_charge"])=c12_reader.event()->getBeamCharge();
-    // **p=c12_reader.runconfig()->getEvent();
-    // *fldHelicity = c12_reader.event()->getHelicity();
-    // *fldBeamCharge = c12_reader.event()->getBeamCharge();
-    
-    // std::cout<<"Event: "<<*(std::get<std::shared_ptr<int>>(map["eventNumber"]))<<std::endl;
     file->Fill();
+
     // progress update
     if (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now()-last_update).count()>=progressInterval){
       fmt::print("Processed {:>7d}/{} ({:>3.0f}%)\n",count,events,100.*count/events);
@@ -129,7 +120,7 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
   df.Display()->Print();
   df.Snapshot("IamGroot", outputfile);
   
-  // std::remove(tempfile.c_str());
+  std::remove(tempfile.c_str());
   std::cout << std::endl<<"done."<<std::endl;
 
   // iguana::AlgorithmSequence seq;
