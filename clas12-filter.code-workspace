@@ -4,7 +4,7 @@
 			"path": "."
 		},
 		{"path": "/opt/CLAS",},
-		// {"path": "/opt/CLAS",},
+		{"path": "/opt/CERN_ROOT_6.36/source",},
 		// {"path": "/opt/CLAS",},
 		// {"path": "/opt/CLAS",},
 		// {"path": "/opt/CLAS",},
@@ -129,7 +129,8 @@
 			"thread": "cpp",
 			"variant": "cpp",
 			"__nullptr": "cpp",
-			"shared_mutex": "cpp"
+			"shared_mutex": "cpp",
+			"ntpl014_framework.C": "cpp"
 		}
 	}
 }

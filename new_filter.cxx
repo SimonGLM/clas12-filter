@@ -9,18 +9,19 @@
 #include <ROOT/RNTuple.hxx>
 #include <ROOT/RNTupleModel.hxx>
 #include <ROOT/RNTupleWriter.hxx>
-// #include <ROOT/RNTupleReader.hxx>
+#include <ROOT/RNTupleReader.hxx>
 #include <ROOT/RMiniFile.hxx>
 
 // Import classes from experimental namespace for the time being
-// using RNTupleModel = ROOT::RNTupleModel;
-// using RNTupleReader = ROOT::Experimental::RNTupleReader;
-// using RNTupleWriter = ROOT::RNTupleWriter;
+using RNTupleModel = ROOT::RNTupleModel;
+using RNTupleReader = ROOT::RNTupleReader;
+using RNTupleWriter = ROOT::RNTupleWriter;
  
 // #include <ROOT/>
 
 #if !defined(__CLING__) || defined(__ROOTCLING__)
 #include "RDataFrame.hxx"
+#include "RSnapshotOptions.hxx"
 #endif
 // #include <TDatabasePDG.h>
 
@@ -39,6 +40,12 @@ void new_filter()
   std::cout << "Called without arguments." << std::endl;
 }
 
+void add_momenta(RNTupleModel model) {
+  for (std::string && part : {"ele","prot","pip","pim","Kp","Km","phot"})
+      for ( std::string && var : {"px","py","pz","E"})
+          model.MakeField<std::vector<double>>("p4_"+part+"_"+var);
+}
+
 int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint numEvents = -1)
 {
   clas12::clas12reader c12_reader(inFile.c_str(), {0});
@@ -47,9 +54,9 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
   int events = numEvents!=-1?numEvents:c12_reader.getReader().getEntries();
   // dict.show(); // Print all bank names
 
-  clas12::clas12databases db;
-  c12_reader.connectDataBases(&db);
-  c12_reader.applyQA("pass2");
+  // clas12::clas12databases db;
+  // c12_reader.connectDataBases(&db);
+  // c12_reader.applyQA("pass2");
   // c12_reader.db()->qadb_requireOkForAsymmetry(true); // what is this? Is this needed in general or specific for every ana task?
 
   // // Prepare Filters
@@ -70,37 +77,59 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
   //////////////////////////////////////////////////////////////////////////////
   std::unique_ptr<ROOT::RNTupleModel> model = ROOT::RNTupleModel::Create();
   // create fields
-  auto fldEvent = model->MakeField<int>("eventNumber");
-  auto fldHelicity = model->MakeField<double>("helicity");
-  auto fldBeamCharge = model->MakeField<double>("beam_charge");
-
+  // default fields (always present)
+  // auto fldEvent = model->MakeField<int>("eventNumber");
+  // auto fldHelicity = model->MakeField<double>("helicity");
+  // auto fldBeamCharge = model->MakeField<double>("beam_charge");
+  std::unordered_map<std::string, std::variant<std::shared_ptr<int>, std::shared_ptr<double>>> map{
+      {"eventNumber", model->MakeField<int>("eventNumber")},
+      {"helicity", model->MakeField<double>("helicity")},
+      {"beam_charge", model->MakeField<double>("beam_charge")}
+  };
+  
   // tell the RNTupleWriter about the structure/model and define names
-  auto file = ROOT::RNTupleWriter::Recreate(std::move(model), "nTupleName","file.root");
-
+  std::string tempfile = "/tmp/rntuple.root";
+  auto file = ROOT::RNTupleWriter::Recreate(std::move(model), "nTupleName", tempfile);
+  
   //////////////////////////////////////////////////////////////////////////////
   // Event loop
   int count = 0;
-  uint progressInterval=5;
+  uint progressInterval=1;
   auto t0= std::chrono::steady_clock::now();
   auto last_update=t0;
- 
+  
   fmt::print("Starting event loop for {} events...\n",events);
   while (c12_reader.next() && ((events != -1 && count < events) || (events == -1 )))
   {
     // body
-    *fldEvent = c12_reader.runconfig()->getEvent();
-    *fldHelicity = c12_reader.event()->getHelicity();
-    *fldBeamCharge = c12_reader.event()->getBeamCharge();
+    std::visit([](auto&& arg){}, map["eventNumber"]);
+    //  
+
+  
+    // auto p=std::get_if<double>(map["eventNumber"])
+    *std::get<std::shared_ptr<int>>(map["eventNumber"])=c12_reader.runconfig()->getEvent();
+    *std::get<std::shared_ptr<double>>(map["helicity"])=c12_reader.event()->getHelicity();
+    *std::get<std::shared_ptr<double>>(map["beam_charge"])=c12_reader.event()->getBeamCharge();
+    // **p=c12_reader.runconfig()->getEvent();
+    // *fldHelicity = c12_reader.event()->getHelicity();
+    // *fldBeamCharge = c12_reader.event()->getBeamCharge();
     
+    // std::cout<<"Event: "<<*(std::get<std::shared_ptr<int>>(map["eventNumber"]))<<std::endl;
     file->Fill();
     // progress update
     if (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now()-last_update).count()>=progressInterval){
-            fmt::print("Processed {:>7d}/{} ({:>3.0f}%)\n",count,events,100.*count/events);
-            last_update=std::chrono::steady_clock::now();
+      fmt::print("Processed {:>7d}/{} ({:>3.0f}%)\n",count,events,100.*count/events);
+      last_update=std::chrono::steady_clock::now();
     }
     count++;
   }
 
+  file.reset(); // close file, ~RNTupleWriter() writes to disk on destruction
+  ROOT::RDataFrame df = ROOT::RDF::FromRNTuple("nTupleName",tempfile.c_str());
+  df.Display()->Print();
+  df.Snapshot("IamGroot", outputfile);
+  
+  // std::remove(tempfile.c_str());
   std::cout << std::endl<<"done."<<std::endl;
 
   // iguana::AlgorithmSequence seq;

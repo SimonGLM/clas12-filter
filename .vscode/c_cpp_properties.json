@@ -19,11 +19,11 @@
         }
     ],
     "env": {
-        "CLAS12ROOT":"/opt/CLAS/ROOT/repo",
+        "CLAS12ROOT":"/opt/CLAS/CLAS12ROOT",
         "ROOT":"/opt/CERN_ROOT_6.36/install",
         "RCDB_HOME":"/opt/CLAS/RCDB",
         "CCDB_HOME":"/opt/CLAS/CCDB",
-        "QADB":"/opt/CLAS/ROOT/repo/clas12-qadb",
+        "QADB":"/opt/CLAS/CLAS12ROOT/clas12-qadb",
         "HIPO":"/opt/CLAS/HIPO/install",
         "IGUANA":"/opt/CLAS/IGUANA/install"
     },
