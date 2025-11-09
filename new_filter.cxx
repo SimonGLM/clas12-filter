@@ -223,8 +223,17 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
 
   // RNTupleWriter does not write the Tree structure to disk.
   // Work around this using tempfile and RDataFrame.Snapshot, which does.
-  ROOT::RDataFrame df = ROOT::RDF::FromRNTuple("nTupleName",tempfile.c_str());
-  df.Display()->Print();
+  ROOT::RDF::RNode df = ROOT::RDF::FromRNTuple("nTupleName",tempfile.c_str());
+  // Redefine all RVec<T> columns to std::vector<T> to support implicit flattening during Draw()
+  auto cols = df.GetColumnNames();
+  for (auto&& name : cols) {
+    auto type = df.GetColumnType(name);
+    if (type.find("RVec<") != std::string::npos) {
+      df = df.Redefine(name, "std::vector(" + name + ".begin(), " + name + ".end())");
+    }
+  }
+  df.Describe().Print();
+  if (! ROOT::IsImplicitMTEnabled()) df.Display()->Print();
   df.Snapshot("out_tree", outputfile);
   // std::remove(tempfile.c_str()); // Delete the temporary file
   

@@ -130,7 +130,8 @@
 			"variant": "cpp",
 			"__nullptr": "cpp",
 			"shared_mutex": "cpp",
-			"ntpl014_framework.C": "cpp"
+			"ntpl014_framework.C": "cpp",
+			"future": "cpp"
 		}
 	}
 }
