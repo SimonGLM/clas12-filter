@@ -267,13 +267,14 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
       }
       // ====================== DETECTOR FIELDS ======================
       if (vars.fParticlesOfInterestForDetectorFields.contains(name)){
-        // Determine which ... detector part the particle was detected in?
-        // CD or FD?
-        // Old way used  1000<=abs(part_status)<2000 => ele_det=1
-        //               2000<=abs(part_Status)<4000 => ele_det=2
+        // Old way used  1000<=abs(part_status)<2000 => FT: ele_det=1
+        //               2000<=abs(part_Status)<4000 => FD: ele_det=2
+        //               4000<=abs(part_Status)      => CD: ele_det=3
         // no idea if this is correct
-        int val = p->getStatus()>=1000 && p->getStatus()<2000 ? 1 :
-                  p->getStatus()>=2000 && p->getStatus()<4000 ? 2 : 0;
+        int status = std::abs(p->getStatus());
+        int val = status>=1000 && status <2000 ? 1 :
+                  status>=2000 && status <4000 ? 2 :
+                  status>=4000 ? 3 : -1;
         vars.AppendValue(name + "_det", val);
       }
 
