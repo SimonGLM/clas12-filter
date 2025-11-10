@@ -6,6 +6,9 @@
 // ROOT
 #include <Rtypes.h>
 #include <TTree.h>
+#include <TDatabasePDG.h>
+#include <ROOT/RDataFrame.hxx>
+#include <ROOT/RSnapshotOptions.hxx>
 #include <ROOT/RNTuple.hxx>
 #include <ROOT/RNTupleModel.hxx>
 #include <ROOT/RNTupleWriter.hxx>
@@ -16,20 +19,12 @@
 using RNTupleModel = ROOT::RNTupleModel;
 using RNTupleReader = ROOT::RNTupleReader;
 using RNTupleWriter = ROOT::RNTupleWriter;
- 
-// #include <ROOT/>
-
-#if !defined(__CLING__) || defined(__ROOTCLING__)
-#include "RDataFrame.hxx"
-#include "RSnapshotOptions.hxx"
-#endif
-#include <TDatabasePDG.h>
 
 // CLAS12
 #include <hipo4/dictionary.h>
 #include <clas12reader.h>
 #include <Iguana.h>
-using namespace iguana::particle; // for lightweight and short PDG code enum, alt.: TDatabasePDG::Instance()->GetParticle("name")->PdgCode()
+namespace pdg = iguana::particle; // for lightweight and short PDG code enum, alt.: TDatabasePDG::Instance()->GetParticle("name")->PdgCode()
 
 // Own stuff
 
@@ -38,81 +33,138 @@ using namespace iguana::particle; // for lightweight and short PDG code enum, al
 // Also provides type-safe setting of the values of the fields via templated SetValue<T>() method.
 // DynamicVarStore::MoveModel() must be used to move the ownership of the built model into
 // the RNTupleWriter.
-class DynamicVarStore {
+class DynamicVarStore
+{
 public:
-    // Constructor that takes ownership of the model
-    DynamicVarStore(std::unique_ptr<ROOT::RNTupleModel> model)
+  // Constructor that takes ownership of the model
+  DynamicVarStore(std::unique_ptr<ROOT::RNTupleModel> model)
       : fModel(std::move(model)) {}
 
+  // Build the model by adding fields of type T with the given name
+  template <typename T>
+  void AddField(const std::string &name)
+  {
+    // Create field in the model and store the shared_ptr<T> in the map
+    fMap[name] = fModel->MakeField<T>(name);
+  }
 
-    // Build the model by adding fields of type T with the given name
-    template <typename T>
-    void AddField(const std::string &name) {
-      // Create field in the model and store the shared_ptr<T> in the map
-        fMap[name] = fModel->MakeField<T>(name);
-    }
+  template <typename T>
+  void SetValue(const std::string &name, const T &value)
+  {
+    assert (IsField(name) && "Field does not exist in DynamicVarStore");
+    // Get the shared_ptr<T> from the map, dereference it and set the value
+    *std::get<std::shared_ptr<T>>(fMap.at(name)) = value;
+  }
 
-    template <typename T>
-    void SetValue(const std::string &name, const T &value) {
-      // Get the shared_ptr<T> from the map, dereference it and set the value
-      *std::get<std::shared_ptr<T>>(fMap.at(name)) = value;
-    }
-
-    void InitVectorFields() {
-      // Get the shared_ptr<std::vector<T>> from the map and clear the vector
-      for (const auto& [name, ptr] : fMap)
-      {
-          std::visit([&](auto&& arg){
+  void ResetVectorFields()
+  {
+    // Get the shared_ptr<std::vector<T>> from the map and clear the vector
+    for (const auto &[name, ptr] : fMap)
+    {
+      std::visit([&](auto &&arg)
+                 {
               using U = std::decay_t<decltype(arg)>;
               if constexpr (std::is_same_v<U, std::shared_ptr<std::vector<int>>> ||
                             std::is_same_v<U, std::shared_ptr<std::vector<float>>> ||
                             std::is_same_v<U, std::shared_ptr<std::vector<double>>>)
               {
                   arg->clear();
-                  // arg->reserve(1024); // reserve some space to avoid multiple allocations
-              }
-          }, ptr);
-      }
+              } }, ptr);
     }
+  }
 
-    template <typename T>
-    T GetValue(const std::string &name) {
-      // Get the shared_ptr<T> from the map, dereference it and return the value
-      return *std::get<std::shared_ptr<T>>(fMap.at(name));
+  template <typename T>
+ void AppendValue(const std::string &name, const T & value)
+  {
+    assert (IsField(name) && "Field does not exist in DynamicVarStore");
+    // Get the shared_ptr<T> from the map, dereference it and return the value
+    std::visit([&](auto &&arg)
+               {
+            using U = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<U, std::shared_ptr<std::vector<T>>>)
+            {
+                arg->push_back(value);
+            } else {
+                throw std::runtime_error("AppendValue called on non-vector field: " + name);
+            } }, fMap.at(name));
+    // std::get<std::shared_ptr<T>>(fMap.at(name)).get().push_back(value);
+  }
+
+  // template <typename T>
+  // T* GetValue(const std::string &name)
+  // {
+  //   // Get the shared_ptr<T> from the map, dereference it and return the value
+  //   return std::get<std::shared_ptr<T>>(fMap.at(name)).get();
+  // }
+
+  // Returns ownership of the model so the caller can move it into the writer
+  std::unique_ptr<ROOT::RNTupleModel> &&MoveModel()
+  {
+    return std::move(fModel);
+  }
+
+  void addMomentaFieldsPerParticle(const std::vector<std::string> &particles)
+  {
+    for (std::string part : particles)
+    {
+      for (std::string &&var : {"px", "py", "pz"})
+        AddField<std::vector<float>>("p4_" + part + "_" + var);
+      AddField<std::vector<double>>("p4_"+part+"_E");
+      fParticlesOfInterestForMomentumFields.insert(part);
     }
-
-    // Returns ownership of the model so the caller can move it into the writer
-    std::unique_ptr<ROOT::RNTupleModel> &&MoveModel() {
-        return std::move(fModel);
+  }
+  void addDetectorFieldsPerParticle(const std::vector<std::string> &particles)
+  {
+    for (std::string part : particles)
+    {
+      AddField<std::vector<int>>(part + "_det");
+      fParticlesOfInterestForDetectorFields.insert(part);
     }
-
-
-    void addMomentaFieldsPerParticle(std::set<std::string> &particles)
-    {        
-      for (std::string part : particles){
-        for ( std::string && var : {"px","py","pz","E"}){
-          AddField<std::vector<double>>("p4_"+part+"_"+var);
-        }
-        // AddField<std::vector<double>>("p4_"+part+"_E");
-      }
+  }
+  
+  void addSectorFieldsPerParticle(const std::vector<std::string> &particles)
+  {
+    for (std::string part : particles)
+    {
+      AddField<std::vector<double>>("p4_"+part + "_sec");
+      fParticlesOfInterestForSectorFields.insert(part);
     }
+  }
+  
+  void addChi2PidFieldsPerParticle(const std::vector<std::string> &particles)
+  {
+    for (std::string part : particles)
+    {
+      AddField<std::vector<double>>("p4_"+part + "_chi2pid");
+      fParticlesOfInterestForChi2PidFields.insert(part);
+    }
+  }
+
+  std::set<std::string> fParticlesOfInterestForMomentumFields{};
+  std::set<std::string> fParticlesOfInterestForDetectorFields{};
+  std::set<std::string> fParticlesOfInterestForSectorFields{};
+  std::set<std::string> fParticlesOfInterestForChi2PidFields{};
+
+  bool IsField(const std::string &name){
+    return fMap.find(name)!=fMap.end();
+  }
 
 private:
-    // Each entry stores a shared_ptr<T> of one of the supported types
-    typedef std::unordered_map<std::string, std::variant<
-        std::shared_ptr<int>,
-        std::shared_ptr<float>,
-        std::shared_ptr<double>,
-        // more future types can be added here e.g. TLorentzVector or std::vector
-        std::shared_ptr<std::vector<int>>,
-        std::shared_ptr<std::vector<float>>,
-        std::shared_ptr<std::vector<double>>,
-        std::shared_ptr<long long>>> variant_map;
-    variant_map fMap;
+  // Each entry stores a shared_ptr<T> of one of the supported types
+  typedef std::unordered_map<std::string, std::variant<
+                                              std::shared_ptr<int>,
+                                              std::shared_ptr<float>,
+                                              std::shared_ptr<double>,
+                                              // more future types can be added here e.g. TLorentzVector or std::vector
+                                              std::shared_ptr<std::vector<int>>,
+                                              std::shared_ptr<std::vector<float>>,
+                                              std::shared_ptr<std::vector<double>>,
+                                              std::shared_ptr<long long>>>
+      variant_map;
+  variant_map fMap;
 
-    std::unique_ptr<ROOT::RNTupleModel> fModel;
+  std::unique_ptr<ROOT::RNTupleModel> fModel;
 };
-
 
 // No argument overload if used without arguments
 void new_filter()
@@ -126,9 +178,8 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
   clas12::clas12reader c12_reader(inFile.c_str(), {0});
 
   hipo::dictionary dict = c12_reader.getDictionary();
-  int events = numEvents!=-1?numEvents:c12_reader.getReader().getEntries();
+  int events = numEvents != -1 ? numEvents : c12_reader.getReader().getEntries();
   // dict.show(); // Print all bank names
-
 
   // // QADB
   //////////////////////////////////////////////////////////////////////////////
@@ -145,7 +196,7 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
   // ig.GetCreators().Use("physics::InclusiveKinematics");
   // ig.SetOptionAll("log", "debug");
   // // ig.Start();
-  
+
   // // PREPARE OUTPUT
   //////////////////////////////////////////////////////////////////////////////
   std::unique_ptr<ROOT::RNTupleModel> model = ROOT::RNTupleModel::Create();
@@ -154,91 +205,123 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
   vars.AddField<int>("eventNumber");
   vars.AddField<int>("helicity");
   vars.AddField<float>("beam_charge");
-  std::set<std::string> particles_set{"ele","prot","pip","pim","Kp","Km","neutr","gamma"};
-  std::map<int, std::string> pdg_to_name{{11,"ele"},
-                                        {2212,"prot"},
-                                        {211,"pip"},
-                                        {-211,"pim"},
-                                        {321,"Kp"},
-                                        {-321,"Km"},
-                                        {22,"gamma"},
-                                        {2112,"neutr"}}; // is neutr a neutron or a gamma?
-  vars.addMomentaFieldsPerParticle(particles_set);
-  
+  // The following lists determine the particles of interest for each group of fields
+  vars.addMomentaFieldsPerParticle({ "ele", "prot", "pip", "pim", "Kp", "Km", "neutr"});
+  vars.addDetectorFieldsPerParticle({"ele", "prot", "pip", "pim", "Kp", "Km", "neutr", "phot"});
+  vars.addSectorFieldsPerParticle({  "ele", "prot", "pip", "pim", "Kp", "Km", "neutr", "phot"});
+  vars.addChi2PidFieldsPerParticle({ "ele", "prot", "pip", "pim", "Kp", "Km", "neutr"});
+  std::map<int, std::string> pdg_to_name{{11, "ele"},
+                                         {2212, "prot"},
+                                         {211, "pip"},
+                                         {-211, "pim"},
+                                         {321, "Kp"},
+                                         {-321, "Km"},
+                                         {22, "gamma"},
+                                         {2112, "neutr"}};
+
   // Create Writer that takes ownership of the model
-  std::string tempfile = "temp_rntuple.root";
+  std::string tempfile = "/tmp/rntuple.root";
   auto file = ROOT::RNTupleWriter::Recreate(vars.MoveModel(), "nTupleName", tempfile);
-  
-  //////////////////////////////////////////////////////////////////////////////
+
   // Event loop
+  //////////////////////////////////////////////////////////////////////////////
   int count = 0;
-  uint progressInterval=1;
-  auto t0=std::chrono::steady_clock::now();
-  auto last_update=t0;
-  
-  fmt::print("Starting event loop for {} events...\n",events);
-  while (c12_reader.next() && ((events != -1 && count < events) || (events == -1 )))
-  {
-    // body
+  uint progressInterval = 1;
+  auto t0 = std::chrono::steady_clock::now();
+  auto last_update = t0;
+
+  fmt::print("Starting event loop for {} events...\n", events);
+  while (c12_reader.next() && ((events != -1 && count < events) || (events == -1))) {
     // access variant stored in map with std::get<> and dereference the shared_ptr to set the that it holds.
     vars.SetValue("eventNumber", c12_reader.runconfig()->getEvent());
     vars.SetValue("helicity", c12_reader.event()->getHelicity());
     vars.SetValue("beam_charge", c12_reader.event()->getBeamCharge());
-    //11s runtime until here for all events
-    vars.InitVectorFields(); // clear and reserve all vector fields
-    auto particles = c12_reader.getDetParticles(); // All detected particles in the event
-    for (auto&& p : particles){
-      auto pdg = TDatabasePDG::Instance()->GetParticle(p->getPid());
-      std::string name = pdg!=nullptr ? pdg_to_name[pdg->PdgCode()] : "unknown";
-      if (particles_set.find(name)!=particles_set.end())
-      {
-          vars.GetValue<std::vector<double>>("p4_"+name+"_px").push_back(p->par()->getPx());
-          vars.GetValue<std::vector<double>>("p4_"+name+"_py").push_back(p->par()->getPy());
-          vars.GetValue<std::vector<double>>("p4_"+name+"_pz").push_back(p->par()->getPz());
-          vars.GetValue<std::vector<double>>("p4_"+name+"_E").push_back(std::sqrt(std::pow(p->par()->getPx(), 2)+
-                                                      std::pow(p->par()->getPy(), 2)+
-                                                      std::pow(p->par()->getPz(), 2)+
-                                                      std::pow(pdg->Mass(), 2)));
-          // 37s with vector ops runtime for all events
-      } else{
+
+    // Filter & Cuts here
+
+    // Correct here
+
+    vars.ResetVectorFields();                       // clear and reserve all vector fields
+    auto particles = c12_reader.getDetParticles();  // All detected particles in the event
+    for (auto &&p : particles){
+
+      // Get PDG enum from namespace pdg=iguana::particle
+      pdg::PDG particle_enum = pdg::PDG(p->getPid());
+      if (particle_enum){
         std::cout << "Unkown particle with PDG Code '" << p->getPid() << "' is not in particle set."<<std::endl;
         continue;
       }
+
+      // ====================== MOMENTUM FIELDS ======================
+      // now we know particle_enum is a known particle, we can get away without std::optionals
+      std::string name = pdg::name.at(particle_enum);
+      if (vars.fParticlesOfInterestForMomentumFields.contains(name)){
+        double m0 = pdg::mass.at(particle_enum); //in GeV
+        vars.AppendValue("p4_" + name + "_px",p->par()->getPx());
+        vars.AppendValue("p4_" + name + "_py",p->par()->getPy());
+        vars.AppendValue("p4_" + name + "_pz",p->par()->getPz());
+        vars.AppendValue("p4_" + name + "_E",std::sqrt(std::pow(p->par()->getPx(), 2) +
+                                                       std::pow(p->par()->getPy(), 2) +
+                                                       std::pow(p->par()->getPz(), 2) +
+                                                       std::pow(m0, 2)));
+      }
+      // ====================== DETECTOR FIELDS ======================
+      if (vars.fParticlesOfInterestForDetectorFields.contains(name)){
+        // Determine which ... detector part the particle was detected in?
+        // CD or FD?
+        // Old way used  1000<=abs(part_status)<2000 => ele_det=1
+        //               2000<=abs(part_Status)<4000 => ele_det=2
+        // no idea if this is correct
+        int val = p->getStatus()>=1000 && p->getStatus()<2000 ? 1 :
+                  p->getStatus()>=2000 && p->getStatus()<4000 ? 2 : 0;
+        vars.AppendValue(name + "_det", val);
+      }
+
+      // ====================== SECTOR FIELDS ======================
+      if (vars.fParticlesOfInterestForSectorFields.contains(name)){
+        vars.AppendValue(name + "_sec", p->getSector());
+      }
+
+      // ====================== CHI2PID FIELDS ======================
+      if (vars.fParticlesOfInterestForChi2PidFields.contains(name)){
+        vars.AppendValue("p4_"+name + "_chi2pid", p->getChi2Pid());
+      }
     }
-    // tell the RNTupleWriter that the values of the pointers stored in 
-    // the fields of the model have changed and to write them to disk
+
+    // tell the RNTupleWriter that the values of the shared_ptrs in
+    // the fields have changed
     file->Fill();
 
     // progress update
-    auto ti=std::chrono::steady_clock::now();
-    if (std::chrono::duration_cast<std::chrono::seconds>(ti-last_update).count()>=progressInterval){
-      fmt::print("Processed {:>7d}/{} ({:>3.0f}%), {:.1f}s remaining\n", count, events, 100.*count/events, std::chrono::duration_cast<std::chrono::milliseconds>(ti-t0).count()*(events*1./count-1)/1000.);
-      last_update=std::chrono::steady_clock::now();
+    auto ti = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::seconds>(ti - last_update).count() >= progressInterval)
+    {
+      float time_remaining = std::chrono::duration_cast<std::chrono::milliseconds>(ti - t0).count() * (events * 1. / count - 1) / 1000.;
+      float percent = 100. * count / events;
+      std::string progress_bar(int(percent*30)/100, '=');
+      progress_bar.append(">");
+      progress_bar.resize(30, ' ');
+      fmt::print("{:>9d}/{:d} ({:>3.0f}%) [{:s}] {:.1f}s remaining\n", count, events, percent, progress_bar, time_remaining);
+      last_update = std::chrono::steady_clock::now();
     }
     count++;
   }
-  fmt::print("Processed a total of {} events in {:.1f} seconds.\n", count, std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-t0).count()/1000.);
+  fmt::print("Processed a total of {} events in {:.1f} seconds.\n", count, std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count() / 1000.);
 
   file.reset(); // close file, ~RNTupleWriter() writes to disk on destruction
 
   // RNTupleWriter does not write the Tree structure to disk.
   // Work around this using tempfile and RDataFrame.Snapshot, which does.
-  ROOT::RDF::RNode df = ROOT::RDF::FromRNTuple("nTupleName",tempfile.c_str());
-  // Redefine all RVec<T> columns to std::vector<T> to support implicit flattening during Draw()
-  auto cols = df.GetColumnNames();
-  for (auto&& name : cols) {
-    auto type = df.GetColumnType(name);
-    if (type.find("RVec<") != std::string::npos) {
-      df = df.Redefine(name, "std::vector(" + name + ".begin(), " + name + ".end())");
-    }
-  }
-  df.Describe().Print();
-  if (! ROOT::IsImplicitMTEnabled()) df.Display()->Print();
-  df.Snapshot("out_tree", outputfile);
-  // std::remove(tempfile.c_str()); // Delete the temporary file
-  
-  std::cout << std::endl<<"done."<<std::endl;
+  ROOT::RDF::RNode df = ROOT::RDF::FromRNTuple("nTupleName", tempfile.c_str());
+  ROOT::RDF::RSnapshotOptions opts;
+  opts.fOverwriteIfExists = true;
+  opts.fVector2RVec = false;
+  opts.fOutputFormat = ROOT::RDF::ESnapshotOutputFormat::kTTree;
+  df.Snapshot("out_tree", outputfile, df.GetColumnNames(), opts);
+  std::remove(tempfile.c_str()); // Delete the temporary file
 
+  std::cout << std::endl
+            << "done." << std::endl;
 
   //////////////////////////////////////////////////////////////////////////////
   // // Stale code
