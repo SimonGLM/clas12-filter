@@ -1,14 +1,14 @@
 /*
-                new_filter.cxx
+        new_filter.cxx
 
-                A simple filter program that reads HIPO4 files using clas12reader,
-                applies some filters and corrections using Iguana, and writes out
-                selected variables into a ROOT RNTuple.
+        A simple filter program that reads HIPO4 files using clas12reader,
+        applies some filters and corrections using Iguana, and writes out
+        selected variables into a ROOT RNTuple.
 
-                Author: Simon Glennemeier-Marke (Justus-Liebig-University Giessen, 2025)
+        Author: Simon Glennemeier-Marke (Justus-Liebig-University Giessen, 2025)
 
-                Note:
-                Code formatted using clang-format with {BasedOnStyle: Google, ColumnLimit: 120}
+        Note:
+        Code formatted using clang-format with {BasedOnStyle: Google, ColumnLimit: 120}
 */
 
 // System
@@ -21,6 +21,7 @@
 #include <type_traits>
 
 // ROOT
+#include <Math/LorentzVector.h>
 #include <Rtypes.h>
 #include <TDatabasePDG.h>
 #include <TTree.h>
@@ -36,10 +37,11 @@
 // CLAS12
 #include <clas12reader.h>
 #include <hipo4/dictionary.h>
-using region_part_ptr = clas12::region_particle*;
-// needs to be included after clas12reader.h
-#include <Iguana.h>
+// using region_part_ptr = clas12::region_particle*; //may be needed for compilation
+#include <Iguana.h>  // needs to be included after clas12reader.h
 
+using namespace std::chrono;
+using FourVector = ROOT::Math::PxPyPzMVector;
 
 auto pdg_name = [](const int& pdg) -> std::string {
   return pdg == 11     ? "ele"
@@ -176,30 +178,59 @@ class DynamicVarStore {
 // No argument overload if used without arguments
 void new_filter() { std::cout << "Called without arguments." << std::endl; }
 
-int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint numEvents = 0) {
+void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint numEvents = 0) {
   ROOT::EnableImplicitMT();
-  clas12::clas12reader c12_reader(inFile);
+  auto c12 = std::make_unique<clas12::clas12reader>(inFile);
+  c12->setVerbose();
+  int events = numEvents != 0 ? numEvents : c12->getReader().getEntries();
 
-  hipo::dictionary dict = c12_reader.getDictionary();
-  int events = numEvents != 0 ? numEvents : c12_reader.getReader().getEntries();
+  // hipo::dictionary dict = c12->getDictionary();
   // dict.show(); // Print all bank names
 
-  // // QADB
+  // QADB
   //////////////////////////////////////////////////////////////////////////////
-  // clas12::clas12databases db;
-  // c12_reader.connectDataBases(&db);
-  // c12_reader.applyQA("pass2");
-  // c12_reader.db()->qadb_requireOkForAsymmetry(true); // what is this? Is this needed in general or specific for
+  clas12::clas12databases db;
+  c12->connectDataBases(&db);
+  // c12->applyQA("pass2");
+  // c12->db()->qadb_requireOkForAsymmetry(true);  // what is this? Is this needed in general or specific for
   // every ana task?
+
+  // Clas12 Filters
+  // c12->addExactPid(11, 1);
+  // c12->addAtLeastPid(11, 1);
+  // c12->addZeroOfRestPid();
 
   // // Prepare Iguana Filters
   //////////////////////////////////////////////////////////////////////////////
-  // clas12root::Iguana ig{};
+  clas12root::Iguana ig{};
+  ig.SetClas12(&c12);
+  // ------ Filters ------
+  ig.GetFilters().Use("clas12::zVertexFilter");
+  // ig.GetFilters().Use("clas12::FiducialFilter");   // Purged from source tree
+  // ig.GetFilters().Use("clas12::PhotonGBTFilter");  // Purged from source tree
+  // ------ Corrections ------
   // ig.GetTransformers().Use("clas12::MomentumCorrection");
-  // ig.GetFilters().Use("clas12::zVertexFilter");
+  // ig.GetTransformers().Use("clas12::FTEnergyCorrection");
+  // ------ Creators ------
   // ig.GetCreators().Use("physics::InclusiveKinematics");
-  // ig.SetOptionAll("log", "debug");
-  // // ig.Start();
+  ig.SetOptionAll("log", "debug");
+  ig.Start();
+
+  // Preparations to have vec4's ready for iguana transforms
+  auto pdg_db = TDatabasePDG::Instance();
+  // std::unordered_map<short, TParticlePDG*> pdg_particles{
+  //     {11, pdg_db->GetParticle(11)},    {2212, pdg_db->GetParticle(2212)}, {2112, pdg_db->GetParticle(2112)},
+  //     {211, pdg_db->GetParticle(211)},  {-211, pdg_db->GetParticle(-211)}, {321, pdg_db->GetParticle(321)},
+  //     {-321, pdg_db->GetParticle(-321)}};
+
+  // Conform to naming from the legacy filter behemoth
+  FourVector p4el(0, 0, 0, pdg_db->GetParticle(11)->Mass());
+  FourVector p4prot(0, 0, 0, pdg_db->GetParticle(2212)->Mass());
+  FourVector p4neutr(0, 0, 0, pdg_db->GetParticle(2112)->Mass());
+  FourVector p4pip(0, 0, 0, pdg_db->GetParticle(211)->Mass());
+  FourVector p4pim(0, 0, 0, pdg_db->GetParticle(-211)->Mass());
+  FourVector p4Kp(0, 0, 0, pdg_db->GetParticle(321)->Mass());
+  FourVector p4Km(0, 0, 0, pdg_db->GetParticle(-321)->Mass());
 
   // // PREPARE OUTPUT
   //////////////////////////////////////////////////////////////////////////////
@@ -226,24 +257,26 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
   //////////////////////////////////////////////////////////////////////////////
   int count = 0;
   uint progressInterval = 1;
-  auto t0 = time::steady_clock::now();
+  auto t0 = steady_clock::now();
   auto last_update = t0;
 
   fmt::print("Starting event loop for {} events...\n", events);
-  while (c12_reader.next() && ((events != -1 && count < events) || (events == -1)))  // 15.4s in Loop (c12.next() 8.8s)
+  while (c12->next() && ((events != -1 && count < events) || (events == -1)))  // 15.4s in Loop (c12.next() 8.8s)
   {
     // access variant stored in map with std::get<> and dereference the shared_ptr to set the that it holds.
-    vars.SetValue("eventnumber", c12_reader.runconfig()->getEvent());
-    vars.SetValue("helicity", c12_reader.event()->getHelicity());
-    vars.SetValue("beam_charge", c12_reader.event()->getBeamCharge());
+    vars.SetValue("eventnumber", c12->runconfig()->getEvent());
+    vars.SetValue("helicity", c12->event()->getHelicity());
+    vars.SetValue("beam_charge", c12->event()->getBeamCharge());
 
-    // Filter & Cuts here
+    // Apply Filter & Cuts here
+    ig.GetFilters().doAllFilters();
+    // ig.GetTransformers().doAllCorrections();
 
     // Correct here
 
-    vars.ResetVectorFields();                       // clear and reserve all vector fields
-    auto particles = c12_reader.getDetParticles();  // All detected particles in the event
-    for (auto&& p : particles)                      // 3.4s in loop
+    vars.ResetVectorFields();                 // clear and reserve all vector fields
+    auto particles = c12->getDetParticles();  // All detected particles in the event
+    for (auto&& p : particles)                // 3.4s in loop
     {
       std::string name = pdg_name(p->getPid());
       if (name == "unknown") {
@@ -302,49 +335,45 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
     file->Fill();  // 2.7 s
 
     // progress update
-    auto ti = time::steady_clock::now();
-    if (time::duration_cast<time::seconds>(ti - last_update).count() >= progressInterval) {
-      float time_remaining =
-          time::duration_cast<time::milliseconds>(ti - t0).count() * (events * 1. / count - 1) / 1000.;
+    auto ti = steady_clock::now();
+    if (duration_cast<seconds>(ti - last_update).count() >= progressInterval) {
+      float time_remaining = duration_cast<milliseconds>(ti - t0).count() * (events * 1. / count - 1) / 1000.;
       float percent = 100. * count / events;
       std::string progress_bar(int(percent * 30) / 100, '=');
       progress_bar.append(">");
       progress_bar.resize(30, ' ');
       fmt::print("{:>9d}/{:d} ({:>3.0f}%) [{:s}] {:.1f}s remaining\n", count, events, percent, progress_bar,
                  time_remaining);
-      last_update = time::steady_clock::now();
+      last_update = steady_clock::now();
     }
     count++;
   }
   fmt::print("Processed a total of {} events in {:.1f} seconds.\n", count,
-             time::duration_cast<time::milliseconds>(time::steady_clock::now() - t0).count() / 1000.);
+             duration_cast<milliseconds>(steady_clock::now() - t0).count() / 1000.);
 
-  auto t1 = time::steady_clock::now();
+  auto t1 = steady_clock::now();
   std::cout << "Writing to RNTuple to temporary file..." << std::flush;
   file.reset();  // close file, ~RNTupleWriter() writes to disk on destruction
-  std::cout << std::format(" {:.1f}s",
-                           time::duration_cast<time::milliseconds>(time::steady_clock::now() - t1).count() / 1000.)
+  std::cout << std::format(" {:.1f}s", duration_cast<milliseconds>(steady_clock::now() - t1).count() / 1000.)
             << std::endl;
   // RNTupleWriter does not write the Tree structure to disk.
   // Work around this using tempfile and RDataFrame.Snapshot, which does.
 
-  auto t2 = time::steady_clock::now();
+  auto t2 = steady_clock::now();
   std::cout << "Reading temporary file into RDataFrame..." << std::flush;
   ROOT::RDF::RNode df = ROOT::RDF::FromRNTuple("nTupleName", tempfile.c_str());
-  std::cout << std::format(" {:.1f}s",
-                           time::duration_cast<time::milliseconds>(time::steady_clock::now() - t2).count() / 1000.)
+  std::cout << std::format(" {:.1f}s", duration_cast<milliseconds>(steady_clock::now() - t2).count() / 1000.)
             << std::endl;
   ROOT::RDF::RSnapshotOptions opts;
   opts.fOverwriteIfExists = true;
   opts.fVector2RVec = false;
   opts.fOutputFormat = ROOT::RDF::ESnapshotOutputFormat::kTTree;
 
-  auto t3 = time::steady_clock::now();
+  auto t3 = steady_clock::now();
   std::cout << std::format("Writing RDataFrame into '{}'...", outputfile) << std::flush;
   df.Snapshot("out_tree", outputfile, df.GetColumnNames(), opts);  // 6.5s
   std::remove(tempfile.c_str());                                   // Delete the temporary file
-  std::cout << std::format(" {:.1f}s",
-                           time::duration_cast<time::milliseconds>(time::steady_clock::now() - t3).count() / 1000.)
+  std::cout << std::format(" {:.1f}s", duration_cast<milliseconds>(steady_clock::now() - t3).count() / 1000.)
             << std::endl;
 
   std::cout << "done." << std::endl;
@@ -409,8 +438,6 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
   //   }
   //   fmt::print("\n");
   // }
-
-  return 0;
 }
 
 int main(int argc, char** argv) {
@@ -423,5 +450,6 @@ int main(int argc, char** argv) {
   std::string output_file = (argc >= 3) ? argv[2] : "output.root";
   uint num_events = (argc >= 4) ? std::stoi(argv[3]) : 0;
 
-  return new_filter(input_file, output_file, num_events);
+  new_filter(input_file, output_file, num_events);
+  return 0;
 }
