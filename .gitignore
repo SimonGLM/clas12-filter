@@ -1,2 +1,4 @@
 *.root
 *.hipo
+*_cxx*
+new_filter
