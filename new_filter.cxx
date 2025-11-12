@@ -1,23 +1,24 @@
 /*
-    new_filter.cxx
-  
-    A simple filter program that reads HIPO4 files using clas12reader,
-    applies some filters and corrections using Iguana, and writes out
-    selected variables into a ROOT RNTuple.
-  
-    Author: Simon Glennemeier-Marke (Justus-Liebig-University Giessen, 2025) 
+                new_filter.cxx
 
-    Note:
-    Code formatted using clang-format with {BasedOnStyle: Google, ColumnLimit: 120}
+                A simple filter program that reads HIPO4 files using clas12reader,
+                applies some filters and corrections using Iguana, and writes out
+                selected variables into a ROOT RNTuple.
+
+                Author: Simon Glennemeier-Marke (Justus-Liebig-University Giessen, 2025)
+
+                Note:
+                Code formatted using clang-format with {BasedOnStyle: Google, ColumnLimit: 120}
 */
-
-
 
 // System
 #include <fmt/format.h>
 
 #include <chrono>
 #include <cmath>
+#include <exception>
+#include <string>
+#include <type_traits>
 
 // ROOT
 #include <Rtypes.h>
@@ -32,19 +33,16 @@
 #include <ROOT/RNTupleWriter.hxx>
 #include <ROOT/RSnapshotOptions.hxx>
 
-// Import classes from experimental namespace for the time being
-using RNTupleModel = ROOT::RNTupleModel;
-using RNTupleReader = ROOT::RNTupleReader;
-using RNTupleWriter = ROOT::RNTupleWriter;
-
 // CLAS12
-#include <Iguana.h>
 #include <clas12reader.h>
 #include <hipo4/dictionary.h>
+using region_part_ptr = clas12::region_particle*;
+// needs to be included after clas12reader.h
+#include <Iguana.h>
+
+namespace time = std::chrono;
 namespace pdg = iguana::particle;  // for lightweight and short PDG code enum, alt.:
                                    // TDatabasePDG::Instance()->GetParticle("name")->PdgCode()
-
-// Own stuff
 
 // A helper class that wraps an RNTupleModel and allows building it up dynamically
 // by adding fields of various types identified by their names as strings.
@@ -65,8 +63,9 @@ class DynamicVarStore {
 
   template <typename T>
   void SetValue(const std::string& name, const T& value) {
-    assert(IsField(name) && "Field does not exist in DynamicVarStore");
+    if (!IsField(name)) throw std::invalid_argument(std::format("Field '{}' does not exist in DynamicVarStore", name));
     // Get the shared_ptr<T> from the map, dereference it and set the value
+    // no `std::get<...>(...).reset(value)` here as that would change the address that is pointed to
     *std::get<std::shared_ptr<T>>(fMap.at(name)) = value;
   }
 
@@ -77,7 +76,6 @@ class DynamicVarStore {
           [&](auto&& arg) {
             using U = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<U, std::shared_ptr<std::vector<int>>> ||
-                          std::is_same_v<U, std::shared_ptr<std::vector<float>>> ||
                           std::is_same_v<U, std::shared_ptr<std::vector<double>>>) {
               arg->clear();
             }
@@ -88,38 +86,37 @@ class DynamicVarStore {
 
   template <typename T>
   void AppendValue(const std::string& name, const T& value) {
-    assert(IsField(name) && "Field does not exist in DynamicVarStore");
-    // Get the shared_ptr<T> from the map, dereference it and return the value
+    if (!IsField(name)) throw std::invalid_argument(std::format("Field '{}' does not exist in DynamicVarStore", name));
+    // Get the shared_ptr<T> from the map, check type, then push_back
     std::visit(
         [&](auto&& arg) {
           using U = std::decay_t<decltype(arg)>;
-          if constexpr (std::is_same_v<U, std::shared_ptr<std::vector<T>>>) {
-            arg->push_back(value);
+          if constexpr (!std::is_same_v<U, std::shared_ptr<std::vector<T>>>) {
+#if __GNUG__
+            throw std::invalid_argument(std::format("Type missmatch between field '{}' and value of type '{}'", name,
+                                                    abi::__cxa_demangle(typeid(arg).name(), NULL, NULL, nullptr)));
+#else
+            throw std::invalid_argument(std::format("Type missmatch between field '{}' and value type", name));
+#endif
           } else {
-            throw std::runtime_error("AppendValue called on non-vector field: " + name);
+            arg->push_back(value);
           }
         },
         fMap.at(name));
-    // std::get<std::shared_ptr<T>>(fMap.at(name)).get().push_back(value);
   }
-
-  // template <typename T>
-  // T* GetValue(const std::string &name)
-  // {
-  //   // Get the shared_ptr<T> from the map, dereference it and return the value
-  //   return std::get<std::shared_ptr<T>>(fMap.at(name)).get();
-  // }
 
   // Returns ownership of the model so the caller can move it into the writer
   std::unique_ptr<ROOT::RNTupleModel>&& MoveModel() { return std::move(fModel); }
 
   void addMomentaFieldsPerParticle(const std::vector<std::string>& particles) {
     for (std::string part : particles) {
-      for (std::string&& var : {"px", "py", "pz"}) AddField<std::vector<float>>("p4_" + part + "_" + var);
-      AddField<std::vector<double>>("p4_" + part + "_E");
+      for (std::string&& var : {"px", "py", "pz", "E"}) {
+        AddField<std::vector<double>>("p4_" + part + "_" + var);
+      }
       fParticlesOfInterestForMomentumFields.insert(part);
     }
   }
+
   void addDetectorFieldsPerParticle(const std::vector<std::string>& particles) {
     for (std::string part : particles) {
       AddField<std::vector<int>>(part + "_det");
@@ -129,7 +126,7 @@ class DynamicVarStore {
 
   void addSectorFieldsPerParticle(const std::vector<std::string>& particles) {
     for (std::string part : particles) {
-      AddField<std::vector<double>>("p4_" + part + "_sec");
+      AddField<std::vector<int>>(part + "_sec");
       fParticlesOfInterestForSectorFields.insert(part);
     }
   }
@@ -141,35 +138,41 @@ class DynamicVarStore {
     }
   }
 
+  void addDCFields() {
+    for (const char& chord : {'x', 'y', 'z'}) AddField<std::vector<double>>(std::format("p4_prot_dc{}1", chord));
+    for (const int& i : {1, 2, 3}) AddField<std::vector<double>>(std::format("p4_ele_dcedge{}", i));
+    fParticlesOfInterestForDCFields.insert("prot");
+    fParticlesOfInterestForDCFields.insert("ele");
+  }
+
   std::set<std::string> fParticlesOfInterestForMomentumFields{};
   std::set<std::string> fParticlesOfInterestForDetectorFields{};
   std::set<std::string> fParticlesOfInterestForSectorFields{};
   std::set<std::string> fParticlesOfInterestForChi2PidFields{};
+  std::set<std::string> fParticlesOfInterestForDCFields{};
 
-  bool IsField(const std::string& name) { return fMap.find(name) != fMap.end(); }
+  bool IsField(const std::string& name) { return fMap.contains(name); }
 
  private:
   // Each entry stores a shared_ptr<T> of one of the supported types
-  typedef std::unordered_map<std::string,
-                             std::variant<std::shared_ptr<int>, std::shared_ptr<float>, std::shared_ptr<double>,
-                                          // more future types can be added here e.g. TLorentzVector or std::vector
-                                          std::shared_ptr<std::vector<int>>, std::shared_ptr<std::vector<float>>,
-                                          std::shared_ptr<std::vector<double>>, std::shared_ptr<long long>>>
-      variant_map;
-  variant_map fMap;
+  using variant_type = std::variant<std::shared_ptr<int>, std::shared_ptr<float>, std::shared_ptr<double>,
+                                    std::shared_ptr<std::vector<int>>, std::shared_ptr<std::vector<float>>,
+                                    std::shared_ptr<std::vector<double>>>;
+  using variant_map = std::unordered_map<std::string, variant_type>;
 
+  variant_map fMap;
   std::unique_ptr<ROOT::RNTupleModel> fModel;
 };
 
 // No argument overload if used without arguments
 void new_filter() { std::cout << "Called without arguments." << std::endl; }
 
-int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint numEvents = -1) {
+int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint numEvents = 0) {
   ROOT::EnableImplicitMT();
-  clas12::clas12reader c12_reader(inFile.c_str(), {0});
+  clas12::clas12reader c12_reader(inFile);
 
   hipo::dictionary dict = c12_reader.getDictionary();
-  int events = numEvents != -1 ? numEvents : c12_reader.getReader().getEntries();
+  int events = numEvents != 0 ? numEvents : c12_reader.getReader().getEntries();
   // dict.show(); // Print all bank names
 
   // // QADB
@@ -177,8 +180,8 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
   // clas12::clas12databases db;
   // c12_reader.connectDataBases(&db);
   // c12_reader.applyQA("pass2");
-  // c12_reader.db()->qadb_requireOkForAsymmetry(true); // what is this? Is this needed in general or specific for every
-  // ana task?
+  // c12_reader.db()->qadb_requireOkForAsymmetry(true); // what is this? Is this needed in general or specific for
+  // every ana task?
 
   // // Prepare Iguana Filters
   //////////////////////////////////////////////////////////////////////////////
@@ -194,16 +197,28 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
   std::unique_ptr<ROOT::RNTupleModel> model = ROOT::RNTupleModel::Create();
   DynamicVarStore vars(std::move(model));
 
-  vars.AddField<int>("eventNumber");
+  vars.AddField<int>("eventnumber");
   vars.AddField<int>("helicity");
   vars.AddField<float>("beam_charge");
+
+  // // pdg lookup helpers
+  // std::unordered_map<pdg::PDG, std::string> pdg_enum_to_name;
+  // std::unordered_map<std::string, pdg::PDG> name_to_pdg_enum;
+  // for (const auto& [enum_val, name] : pdg::name) pdg_enum_to_name.insert({enum_val, name});
+  // for (const auto& [enum_val, name] : pdg::name) name_to_pdg_enum.insert({name, enum_val});
+  // // or
+  // std::map<int, std::string> pdg_to_name{{11, "ele"}, {2212, "prot"}, {211, "pip"},  {-211, "pim"},
+  //                                        {321, "Kp"}, {-321, "kaon_minus"},   {22, "gamma"}, {2112, "neutron"}};
+
   // The following lists determine the particles of interest for each group of fields
-  vars.addMomentaFieldsPerParticle({"ele", "prot", "pip", "pim", "Kp", "Km", "neutr"});
-  vars.addDetectorFieldsPerParticle({"ele", "prot", "pip", "pim", "Kp", "Km", "neutr", "phot"});
-  vars.addSectorFieldsPerParticle({"ele", "prot", "pip", "pim", "Kp", "Km", "neutr", "phot"});
-  vars.addChi2PidFieldsPerParticle({"ele", "prot", "pip", "pim", "Kp", "Km", "neutr"});
-  std::map<int, std::string> pdg_to_name{{11, "ele"}, {2212, "prot"}, {211, "pip"},  {-211, "pim"},
-                                         {321, "Kp"}, {-321, "Km"},   {22, "gamma"}, {2112, "neutr"}};
+  // later they will come from a config file
+  vars.addMomentaFieldsPerParticle({"electron", "proton", "pi_plus", "pi_minus", "kaon_plus", "kaon_minus", "neutron"});
+  vars.addDetectorFieldsPerParticle(
+      {"electron", "proton", "pi_plus", "pi_minus", "kaon_plus", "kaon_minus", "neutron", "photon"});
+  vars.addChi2PidFieldsPerParticle({"electron", "proton", "pi_plus", "pi_minus", "kaon_plus", "kaon_minus", "neutron"});
+  vars.addSectorFieldsPerParticle(
+      {"electron", "proton", "pi_plus", "pi_minus", "kaon_plus", "kaon_minus", "neutron", "photon"});
+  vars.addDCFields();
 
   // Create Writer that takes ownership of the model
   std::string tempfile = "/tmp/rntuple.root";
@@ -213,13 +228,14 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
   //////////////////////////////////////////////////////////////////////////////
   int count = 0;
   uint progressInterval = 1;
-  auto t0 = std::chrono::steady_clock::now();
+  auto t0 = time::steady_clock::now();
   auto last_update = t0;
 
   fmt::print("Starting event loop for {} events...\n", events);
-  while (c12_reader.next() && ((events != -1 && count < events) || (events == -1))) {
+  while (c12_reader.next() && ((events != -1 && count < events) || (events == -1)))  // 15.4s in Loop (c12.next() 8.8s)
+  {
     // access variant stored in map with std::get<> and dereference the shared_ptr to set the that it holds.
-    vars.SetValue("eventNumber", c12_reader.runconfig()->getEvent());
+    vars.SetValue("eventnumber", c12_reader.runconfig()->getEvent());
     vars.SetValue("helicity", c12_reader.event()->getHelicity());
     vars.SetValue("beam_charge", c12_reader.event()->getBeamCharge());
 
@@ -229,25 +245,26 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
 
     vars.ResetVectorFields();                       // clear and reserve all vector fields
     auto particles = c12_reader.getDetParticles();  // All detected particles in the event
-    for (auto&& p : particles) {
+    for (auto&& p : particles)                      // 3.4s in loop
+    {
       // Get PDG enum from namespace pdg=iguana::particle
-      pdg::PDG particle_enum = pdg::PDG(p->getPid());
-      if (particle_enum) {
-        std::cout << "Unkown particle with PDG Code '" << p->getPid() << "' is not in particle set." << std::endl;
+      auto name_opt = pdg::get(pdg::name, p->getPid());
+      if (!name_opt.has_value()) {
+        // std::cout << "Unknown particle with PDG code " << p->getPid() << " found, skipping..." << std::endl;
         continue;
       }
 
       // ====================== MOMENTUM FIELDS ======================
       // now we know particle_enum is a known particle, we can get away without std::optionals
-      std::string name = pdg::name.at(particle_enum);
+      std::string name = name_opt.value();
       if (vars.fParticlesOfInterestForMomentumFields.contains(name)) {
-        double m0 = pdg::mass.at(particle_enum);  // in GeV
-        vars.AppendValue("p4_" + name + "_px", p->par()->getPx());
-        vars.AppendValue("p4_" + name + "_py", p->par()->getPy());
-        vars.AppendValue("p4_" + name + "_pz", p->par()->getPz());
+        double m0 = pdg::get(pdg::mass, p->getPid()).value_or(0.0);  // in GeV
+        vars.AppendValue("p4_" + name + "_px", static_cast<double>(p->par()->getPx()));
+        vars.AppendValue("p4_" + name + "_py", static_cast<double>(p->par()->getPy()));
+        vars.AppendValue("p4_" + name + "_pz", static_cast<double>(p->par()->getPz()));
         vars.AppendValue("p4_" + name + "_E",
-                         std::sqrt(std::pow(p->par()->getPx(), 2) + std::pow(p->par()->getPy(), 2) +
-                                   std::pow(p->par()->getPz(), 2) + std::pow(m0, 2)));
+                         static_cast<double>(std::sqrt(std::pow(p->par()->getPx(), 2) + std::pow(p->par()->getPy(), 2) +
+                                                       std::pow(p->par()->getPz(), 2) + std::pow(m0, 2))));
       }
       // ====================== DETECTOR FIELDS ======================
       if (vars.fParticlesOfInterestForDetectorFields.contains(name)) {
@@ -262,51 +279,79 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
 
       // ====================== SECTOR FIELDS ======================
       if (vars.fParticlesOfInterestForSectorFields.contains(name)) {
-        vars.AppendValue(name + "_sec", p->getSector());
+        vars.AppendValue(name + "_sec", static_cast<int>(p->getSector()));
       }
 
       // ====================== CHI2PID FIELDS ======================
       if (vars.fParticlesOfInterestForChi2PidFields.contains(name)) {
-        vars.AppendValue("p4_" + name + "_chi2pid", p->getChi2Pid());
+        vars.AppendValue("p4_" + name + "_chi2pid", static_cast<double>(p->getChi2Pid()));
+      }
+
+      // ====================== DC FIELDS ======================
+      if (vars.fParticlesOfInterestForDCFields.contains(name)) {
+        if (name == "electron") {
+          vars.AppendValue("p4_" + name + "_dcedge1", static_cast<double>(p->traj(clas12::DC, 6)->getEdge()));
+          vars.AppendValue("p4_" + name + "_dcedge2", static_cast<double>(p->traj(clas12::DC, 18)->getEdge()));
+          vars.AppendValue("p4_" + name + "_dcedge3", static_cast<double>(p->traj(clas12::DC, 36)->getEdge()));
+        } else if (name == "prot") {
+          vars.AppendValue("p4_" + name + "_dcx1", static_cast<double>(p->traj(clas12::DC, 6)->getX()));
+          vars.AppendValue("p4_" + name + "_dcy1", static_cast<double>(p->traj(clas12::DC, 6)->getY()));
+          vars.AppendValue("p4_" + name + "_dcz1", static_cast<double>(p->traj(clas12::DC, 6)->getZ()));
+        }
       }
     }
 
     // tell the RNTupleWriter that the values of the shared_ptrs in
     // the fields have changed
-    file->Fill();
+    file->Fill();  // 2.7 s
 
     // progress update
-    auto ti = std::chrono::steady_clock::now();
-    if (std::chrono::duration_cast<std::chrono::seconds>(ti - last_update).count() >= progressInterval) {
+    auto ti = time::steady_clock::now();
+    if (time::duration_cast<time::seconds>(ti - last_update).count() >= progressInterval) {
       float time_remaining =
-          std::chrono::duration_cast<std::chrono::milliseconds>(ti - t0).count() * (events * 1. / count - 1) / 1000.;
+          time::duration_cast<time::milliseconds>(ti - t0).count() * (events * 1. / count - 1) / 1000.;
       float percent = 100. * count / events;
       std::string progress_bar(int(percent * 30) / 100, '=');
       progress_bar.append(">");
       progress_bar.resize(30, ' ');
       fmt::print("{:>9d}/{:d} ({:>3.0f}%) [{:s}] {:.1f}s remaining\n", count, events, percent, progress_bar,
                  time_remaining);
-      last_update = std::chrono::steady_clock::now();
+      last_update = time::steady_clock::now();
     }
     count++;
   }
-  fmt::print(
-      "Processed a total of {} events in {:.1f} seconds.\n", count,
-      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count() / 1000.);
+  fmt::print("Processed a total of {} events in {:.1f} seconds.\n", count,
+             time::duration_cast<time::milliseconds>(time::steady_clock::now() - t0).count() / 1000.);
 
+  auto t1 = time::steady_clock::now();
+  std::cout << "Writing to RNTuple to temporary file..." << std::flush;
   file.reset();  // close file, ~RNTupleWriter() writes to disk on destruction
-
+  std::cout << std::format(" {:.1f}s",
+                           time::duration_cast<time::milliseconds>(time::steady_clock::now() - t1).count() / 1000.)
+            << std::endl;
   // RNTupleWriter does not write the Tree structure to disk.
   // Work around this using tempfile and RDataFrame.Snapshot, which does.
+
+  auto t2 = time::steady_clock::now();
+  std::cout << "Reading temporary file into RDataFrame..." << std::flush;
   ROOT::RDF::RNode df = ROOT::RDF::FromRNTuple("nTupleName", tempfile.c_str());
+  std::cout << std::format(" {:.1f}s",
+                           time::duration_cast<time::milliseconds>(time::steady_clock::now() - t2).count() / 1000.)
+            << std::endl;
   ROOT::RDF::RSnapshotOptions opts;
   opts.fOverwriteIfExists = true;
   opts.fVector2RVec = false;
   opts.fOutputFormat = ROOT::RDF::ESnapshotOutputFormat::kTTree;
-  df.Snapshot("out_tree", outputfile, df.GetColumnNames(), opts);
-  std::remove(tempfile.c_str());  // Delete the temporary file
 
-  std::cout << std::endl << "done." << std::endl;
+  auto t3 = time::steady_clock::now();
+  std::cout << std::format("Writing RDataFrame into '{}'...", outputfile) << std::flush;
+  df.Snapshot("out_tree", outputfile, df.GetColumnNames(), opts);  // 6.5s
+  std::remove(tempfile.c_str());                                   // Delete the temporary file
+  std::cout << std::format(" {:.1f}s",
+                           time::duration_cast<time::milliseconds>(time::steady_clock::now() - t3).count() / 1000.)
+            << std::endl;
+
+  std::cout << "done." << std::endl;
 
   //////////////////////////////////////////////////////////////////////////////
   // // Stale code
@@ -370,4 +415,17 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
   // }
 
   return 0;
+}
+
+int main(int argc, char** argv) {
+  if (argc < 2) {
+    std::cout << "Usage: new_filter <input_file> [output_file] [num_events]" << std::endl;
+    return 1;
+  }
+
+  std::string input_file = argv[1];
+  std::string output_file = (argc >= 3) ? argv[2] : "output.root";
+  uint num_events = (argc >= 4) ? std::stoi(argv[3]) : 0;
+
+  return new_filter(input_file, output_file, num_events);
 }
