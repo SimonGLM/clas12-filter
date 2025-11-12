@@ -40,9 +40,18 @@ using region_part_ptr = clas12::region_particle*;
 // needs to be included after clas12reader.h
 #include <Iguana.h>
 
-namespace time = std::chrono;
-namespace pdg = iguana::particle;  // for lightweight and short PDG code enum, alt.:
-                                   // TDatabasePDG::Instance()->GetParticle("name")->PdgCode()
+
+auto pdg_name = [](const int& pdg) -> std::string {
+  return pdg == 11     ? "ele"
+         : pdg == 22   ? "phot"
+         : pdg == 2212 ? "prot"
+         : pdg == 2112 ? "neutr"
+         : pdg == 211  ? "pip"
+         : pdg == -211 ? "pim"
+         : pdg == 321  ? "Kp"
+         : pdg == -321 ? "Km"
+                       : "unknown";
+};
 
 // A helper class that wraps an RNTupleModel and allows building it up dynamically
 // by adding fields of various types identified by their names as strings.
@@ -108,32 +117,32 @@ class DynamicVarStore {
   // Returns ownership of the model so the caller can move it into the writer
   std::unique_ptr<ROOT::RNTupleModel>&& MoveModel() { return std::move(fModel); }
 
-  void addMomentaFieldsPerParticle(const std::vector<std::string>& particles) {
-    for (std::string part : particles) {
+  void addMomentaFieldsPerParticle(const std::vector<int>& particles) {
+    for (int part : particles) {
       for (std::string&& var : {"px", "py", "pz", "E"}) {
-        AddField<std::vector<double>>("p4_" + part + "_" + var);
+        AddField<std::vector<double>>("p4_" + pdg_name(part) + "_" + var);
       }
       fParticlesOfInterestForMomentumFields.insert(part);
     }
   }
 
-  void addDetectorFieldsPerParticle(const std::vector<std::string>& particles) {
-    for (std::string part : particles) {
-      AddField<std::vector<int>>(part + "_det");
+  void addDetectorFieldsPerParticle(const std::vector<int>& particles) {
+    for (int part : particles) {
+      AddField<std::vector<int>>(pdg_name(part) + "_det");
       fParticlesOfInterestForDetectorFields.insert(part);
     }
   }
 
-  void addSectorFieldsPerParticle(const std::vector<std::string>& particles) {
-    for (std::string part : particles) {
-      AddField<std::vector<int>>(part + "_sec");
+  void addSectorFieldsPerParticle(const std::vector<int>& particles) {
+    for (int part : particles) {
+      AddField<std::vector<int>>(pdg_name(part) + "_sec");
       fParticlesOfInterestForSectorFields.insert(part);
     }
   }
 
-  void addChi2PidFieldsPerParticle(const std::vector<std::string>& particles) {
-    for (std::string part : particles) {
-      AddField<std::vector<double>>("p4_" + part + "_chi2pid");
+  void addChi2PidFieldsPerParticle(const std::vector<int>& particles) {
+    for (int part : particles) {
+      AddField<std::vector<double>>("p4_" + pdg_name(part) + "_chi2pid");
       fParticlesOfInterestForChi2PidFields.insert(part);
     }
   }
@@ -141,15 +150,15 @@ class DynamicVarStore {
   void addDCFields() {
     for (const char& chord : {'x', 'y', 'z'}) AddField<std::vector<double>>(std::format("p4_prot_dc{}1", chord));
     for (const int& i : {1, 2, 3}) AddField<std::vector<double>>(std::format("p4_ele_dcedge{}", i));
-    fParticlesOfInterestForDCFields.insert("prot");
-    fParticlesOfInterestForDCFields.insert("ele");
+    fParticlesOfInterestForDCFields.insert(2212);
+    fParticlesOfInterestForDCFields.insert(11);
   }
 
-  std::set<std::string> fParticlesOfInterestForMomentumFields{};
-  std::set<std::string> fParticlesOfInterestForDetectorFields{};
-  std::set<std::string> fParticlesOfInterestForSectorFields{};
-  std::set<std::string> fParticlesOfInterestForChi2PidFields{};
-  std::set<std::string> fParticlesOfInterestForDCFields{};
+  std::set<int> fParticlesOfInterestForMomentumFields{};
+  std::set<int> fParticlesOfInterestForDetectorFields{};
+  std::set<int> fParticlesOfInterestForSectorFields{};
+  std::set<int> fParticlesOfInterestForChi2PidFields{};
+  std::set<int> fParticlesOfInterestForDCFields{};
 
   bool IsField(const std::string& name) { return fMap.contains(name); }
 
@@ -201,23 +210,12 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
   vars.AddField<int>("helicity");
   vars.AddField<float>("beam_charge");
 
-  // // pdg lookup helpers
-  // std::unordered_map<pdg::PDG, std::string> pdg_enum_to_name;
-  // std::unordered_map<std::string, pdg::PDG> name_to_pdg_enum;
-  // for (const auto& [enum_val, name] : pdg::name) pdg_enum_to_name.insert({enum_val, name});
-  // for (const auto& [enum_val, name] : pdg::name) name_to_pdg_enum.insert({name, enum_val});
-  // // or
-  // std::map<int, std::string> pdg_to_name{{11, "ele"}, {2212, "prot"}, {211, "pip"},  {-211, "pim"},
-  //                                        {321, "Kp"}, {-321, "kaon_minus"},   {22, "gamma"}, {2112, "neutron"}};
-
   // The following lists determine the particles of interest for each group of fields
   // later they will come from a config file
-  vars.addMomentaFieldsPerParticle({"electron", "proton", "pi_plus", "pi_minus", "kaon_plus", "kaon_minus", "neutron"});
-  vars.addDetectorFieldsPerParticle(
-      {"electron", "proton", "pi_plus", "pi_minus", "kaon_plus", "kaon_minus", "neutron", "photon"});
-  vars.addChi2PidFieldsPerParticle({"electron", "proton", "pi_plus", "pi_minus", "kaon_plus", "kaon_minus", "neutron"});
-  vars.addSectorFieldsPerParticle(
-      {"electron", "proton", "pi_plus", "pi_minus", "kaon_plus", "kaon_minus", "neutron", "photon"});
+  vars.addMomentaFieldsPerParticle({11, 2212, 2112, 211, -211, 321, -321});
+  vars.addDetectorFieldsPerParticle({11, 22, 2212, 2112, 211, -211, 321, -321});
+  vars.addChi2PidFieldsPerParticle({11, 2212, 2112, 211, -211, 321, -321});
+  vars.addSectorFieldsPerParticle({11, 22, 2212, 2112, 211, -211, 321, -321});
   vars.addDCFields();
 
   // Create Writer that takes ownership of the model
@@ -247,17 +245,15 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
     auto particles = c12_reader.getDetParticles();  // All detected particles in the event
     for (auto&& p : particles)                      // 3.4s in loop
     {
-      // Get PDG enum from namespace pdg=iguana::particle
-      auto name_opt = pdg::get(pdg::name, p->getPid());
-      if (!name_opt.has_value()) {
+      std::string name = pdg_name(p->getPid());
+      if (name == "unknown") {
         // std::cout << "Unknown particle with PDG code " << p->getPid() << " found, skipping..." << std::endl;
         continue;
       }
 
       // ====================== MOMENTUM FIELDS ======================
       // now we know particle_enum is a known particle, we can get away without std::optionals
-      std::string name = name_opt.value();
-      if (vars.fParticlesOfInterestForMomentumFields.contains(name)) {
+      if (vars.fParticlesOfInterestForMomentumFields.contains(p->getPid())) {
         double m0 = pdg::get(pdg::mass, p->getPid()).value_or(0.0);  // in GeV
         vars.AppendValue("p4_" + name + "_px", static_cast<double>(p->par()->getPx()));
         vars.AppendValue("p4_" + name + "_py", static_cast<double>(p->par()->getPy()));
@@ -267,7 +263,7 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
                                                        std::pow(p->par()->getPz(), 2) + std::pow(m0, 2))));
       }
       // ====================== DETECTOR FIELDS ======================
-      if (vars.fParticlesOfInterestForDetectorFields.contains(name)) {
+      if (vars.fParticlesOfInterestForDetectorFields.contains(p->getPid())) {
         // Old way used  1000<=abs(part_status)<2000 => FT: ele_det=1
         //               2000<=abs(part_Status)<4000 => FD: ele_det=2
         //               4000<=abs(part_Status)      => CD: ele_det=3
@@ -278,22 +274,22 @@ int new_filter(std::string inFile, std::string outputfile = "/dev/null", uint nu
       }
 
       // ====================== SECTOR FIELDS ======================
-      if (vars.fParticlesOfInterestForSectorFields.contains(name)) {
+      if (vars.fParticlesOfInterestForSectorFields.contains(p->getPid())) {
         vars.AppendValue(name + "_sec", static_cast<int>(p->getSector()));
       }
 
       // ====================== CHI2PID FIELDS ======================
-      if (vars.fParticlesOfInterestForChi2PidFields.contains(name)) {
+      if (vars.fParticlesOfInterestForChi2PidFields.contains(p->getPid())) {
         vars.AppendValue("p4_" + name + "_chi2pid", static_cast<double>(p->getChi2Pid()));
       }
 
       // ====================== DC FIELDS ======================
-      if (vars.fParticlesOfInterestForDCFields.contains(name)) {
-        if (name == "electron") {
+      if (vars.fParticlesOfInterestForDCFields.contains(p->getPid())) {
+        if (name == pdg_name(11)) {  // alternatively: if (p->getPid()==11)
           vars.AppendValue("p4_" + name + "_dcedge1", static_cast<double>(p->traj(clas12::DC, 6)->getEdge()));
           vars.AppendValue("p4_" + name + "_dcedge2", static_cast<double>(p->traj(clas12::DC, 18)->getEdge()));
           vars.AppendValue("p4_" + name + "_dcedge3", static_cast<double>(p->traj(clas12::DC, 36)->getEdge()));
-        } else if (name == "prot") {
+        } else if (name == pdg_name(2122)) {
           vars.AppendValue("p4_" + name + "_dcx1", static_cast<double>(p->traj(clas12::DC, 6)->getX()));
           vars.AppendValue("p4_" + name + "_dcy1", static_cast<double>(p->traj(clas12::DC, 6)->getY()));
           vars.AppendValue("p4_" + name + "_dcz1", static_cast<double>(p->traj(clas12::DC, 6)->getZ()));
