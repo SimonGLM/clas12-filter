@@ -43,7 +43,7 @@ using region_part_ptr = clas12::region_particle*;  // needed for compilation
 #include <iguana/algorithms/clas12/EventBuilderFilter/Algorithm.h>
 
 // Own
-// #include "cuts.h" // future
+#include "cuts.h"
 
 using namespace std::chrono;
 using FourVector = ROOT::Math::PxPyPzMVector;
@@ -305,7 +305,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
       // c12->event()->getHelicity();     // or this?
       
       // ====================== PARTICLE CUTS ======================
-      // if (!cuts::CC_nphe_cut(p)) continue; // future
+      if (!cuts::CC_nphe_cut(p)) continue;
       
 
       // ===========================================================
