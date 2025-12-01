@@ -40,7 +40,7 @@
 | `Km_EC_outer_vs_EC_inner_cut` | ✅ | Same as `EC_outer_vs_EC_inner_cut` with `loose` tightness |
 | `pim_EC_outer_vs_EC_inner_cut` | ✅ | Same as `EC_outer_vs_EC_inner_cut` with `loose` tightness |
 | `phot_EC_outer_vs_EC_inner_cut` | ✅ | Similar to `EC_outer_vs_EC_inner_cut` (checks ECin+ECout, instead of PCAL)|
-| `EC_sampling_fraction_cut` | 👨‍💻 WIP | Complicated logic, needs clarification |
+| `EC_sampling_fraction_cut` | ✅ | Some TODOs in code: (bools & RCDB)
 | `EC_hit_position_fiducial_cut` | ❔ | Declared, not Defined |
 | `EC_hit_position_fiducial_cut_homogeneous` | ✅ | |
 | `phot_EC_hit_position_fiducial_cut` | ✅ | Identical to `EC_hit_position_fiducial_cut_homogeneous`, except for the 13.5 value |
