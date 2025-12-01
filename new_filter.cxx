@@ -16,9 +16,7 @@
 
 #include <chrono>
 #include <cmath>
-#include <exception>
 #include <string>
-#include <type_traits>
 
 // ROOT
 #include <Math/LorentzVector.h>
@@ -35,15 +33,22 @@
 #include <ROOT/RSnapshotOptions.hxx>
 
 // CLAS12
+#include <clas12defs.h>
 #include <clas12reader.h>
-#include <hipo4/dictionary.h>
-// using region_part_ptr = clas12::region_particle*; //may be needed for compilation
-#include <Iguana.h>  // needs to be included after clas12reader.h
+#include <region_particle.h>
+using region_part_ptr = clas12::region_particle*;  // needed for compilation
+
+#include <Iguana.h>                                // needs to be included after clas12reader.h
+#include <iguana/algorithms/AlgorithmSequence.h>
+#include <iguana/algorithms/clas12/EventBuilderFilter/Algorithm.h>
+
+// Own
+// #include "cuts.h" // future
 
 using namespace std::chrono;
 using FourVector = ROOT::Math::PxPyPzMVector;
 
-auto pdg_name = [](const int& pdg) -> std::string {
+std::string pdg_name(const int& pdg) {
   return pdg == 11     ? "ele"
          : pdg == 22   ? "phot"
          : pdg == 2212 ? "prot"
@@ -116,10 +121,11 @@ class DynamicVarStore {
         fMap.at(name));
   }
 
-  // Returns ownership of the model so the caller can move it into the writer
-  std::unique_ptr<ROOT::RNTupleModel>&& MoveModel() { return std::move(fModel); }
+  // Returns the reference to the Model pointer, so that ownership can be moved
+  std::unique_ptr<ROOT::RNTupleModel>& Model() { return fModel; }
+  // std::unique_ptr<ROOT::RNTupleModel>&& MoveModel() { return std::move(fModel); }
 
-  void addMomentaFieldsPerParticle(const std::vector<int>& particles) {
+  void AddMomentaFieldsPerParticle(const std::vector<int>& particles) {
     for (int part : particles) {
       for (std::string&& var : {"px", "py", "pz", "E"}) {
         AddField<std::vector<double>>("p4_" + pdg_name(part) + "_" + var);
@@ -128,28 +134,28 @@ class DynamicVarStore {
     }
   }
 
-  void addDetectorFieldsPerParticle(const std::vector<int>& particles) {
+  void AddDetectorFieldsPerParticle(const std::vector<int>& particles) {
     for (int part : particles) {
       AddField<std::vector<int>>(pdg_name(part) + "_det");
       fParticlesOfInterestForDetectorFields.insert(part);
     }
   }
 
-  void addSectorFieldsPerParticle(const std::vector<int>& particles) {
+  void AddSectorFieldsPerParticle(const std::vector<int>& particles) {
     for (int part : particles) {
       AddField<std::vector<int>>(pdg_name(part) + "_sec");
       fParticlesOfInterestForSectorFields.insert(part);
     }
   }
 
-  void addChi2PidFieldsPerParticle(const std::vector<int>& particles) {
+  void AddChi2PidFieldsPerParticle(const std::vector<int>& particles) {
     for (int part : particles) {
       AddField<std::vector<double>>("p4_" + pdg_name(part) + "_chi2pid");
       fParticlesOfInterestForChi2PidFields.insert(part);
     }
   }
 
-  void addDCFields() {
+  void AddDCFields() {
     for (const char& chord : {'x', 'y', 'z'}) AddField<std::vector<double>>(std::format("p4_prot_dc{}1", chord));
     for (const int& i : {1, 2, 3}) AddField<std::vector<double>>(std::format("p4_ele_dcedge{}", i));
     fParticlesOfInterestForDCFields.insert(2212);
@@ -191,16 +197,17 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   //////////////////////////////////////////////////////////////////////////////
   clas12::clas12databases db;
   c12->connectDataBases(&db);
-  // c12->applyQA("pass2");
-  // c12->db()->qadb_requireOkForAsymmetry(true);  // what is this? Is this needed in general or specific for
-  // every ana task?
+  c12->applyQA("pass2");
+  // c12->db()->qadb_requireOkForAsymmetry(true);  // what is this?
+  // Is this needed in general or specific for every ana task?
 
   // Clas12 Filters
-  // c12->addExactPid(11, 1);
-  // c12->addAtLeastPid(11, 1);
-  // c12->addZeroOfRestPid();
+  // c12->AddExactPid(11, 1);
+  // c12->AddAtLeastPid(11, 1);
+  // c12->AddZeroOfRestPid();
 
-  // // Prepare Iguana Filters
+
+  // // Prepare Clas12 Iguana Filters
   //////////////////////////////////////////////////////////////////////////////
   clas12root::Iguana ig{};
   ig.SetClas12(&c12);
@@ -209,28 +216,29 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   // ig.GetFilters().Use("clas12::FiducialFilter");   // Purged from source tree
   // ig.GetFilters().Use("clas12::PhotonGBTFilter");  // Purged from source tree
   // ------ Corrections ------
-  // ig.GetTransformers().Use("clas12::MomentumCorrection");
-  // ig.GetTransformers().Use("clas12::FTEnergyCorrection");
+  // ig.GetTransformers().Use("clas12::MomentumCorrection");  // renamed in Iguana but not in clas12root::Iguana
+  // ig.GetTransformers().Use("clas12::FTEnergyCorrection");  // therefore wholy inoperable
   // ------ Creators ------
   // ig.GetCreators().Use("physics::InclusiveKinematics");
   ig.SetOptionAll("log", "debug");
   ig.Start();
 
+  // // Prepare Iguana Algorithm 
+  //////////////////////////////////////////////////////////////////////////////
+  iguana::AlgorithmSequence seq;
+  seq.Add<iguana::clas12::ZVertexFilter>("clas12::ZVertexFilter"); // Filter for PIDs from EventBuilder
+  seq.SetOption("pid_filter", "log", "info");
+  seq.Start();
+
   // Preparations to have vec4's ready for iguana transforms
   auto pdg_db = TDatabasePDG::Instance();
-  // std::unordered_map<short, TParticlePDG*> pdg_particles{
-  //     {11, pdg_db->GetParticle(11)},    {2212, pdg_db->GetParticle(2212)}, {2112, pdg_db->GetParticle(2112)},
-  //     {211, pdg_db->GetParticle(211)},  {-211, pdg_db->GetParticle(-211)}, {321, pdg_db->GetParticle(321)},
-  //     {-321, pdg_db->GetParticle(-321)}};
-
-  // Conform to naming from the legacy filter behemoth
-  FourVector p4el(0, 0, 0, pdg_db->GetParticle(11)->Mass());
-  FourVector p4prot(0, 0, 0, pdg_db->GetParticle(2212)->Mass());
-  FourVector p4neutr(0, 0, 0, pdg_db->GetParticle(2112)->Mass());
-  FourVector p4pip(0, 0, 0, pdg_db->GetParticle(211)->Mass());
-  FourVector p4pim(0, 0, 0, pdg_db->GetParticle(-211)->Mass());
-  FourVector p4Kp(0, 0, 0, pdg_db->GetParticle(321)->Mass());
-  FourVector p4Km(0, 0, 0, pdg_db->GetParticle(-321)->Mass());
+  FourVector p4_el(0, 0, 0, pdg_db->GetParticle(11)->Mass());
+  FourVector p4_prot(0, 0, 0, pdg_db->GetParticle(2212)->Mass());
+  FourVector p4_neutr(0, 0, 0, pdg_db->GetParticle(2112)->Mass());
+  FourVector p4_pip(0, 0, 0, pdg_db->GetParticle(211)->Mass());
+  FourVector p4_pim(0, 0, 0, pdg_db->GetParticle(-211)->Mass());
+  FourVector p4_Kp(0, 0, 0, pdg_db->GetParticle(321)->Mass());
+  FourVector p4_Km(0, 0, 0, pdg_db->GetParticle(-321)->Mass());
 
   // // PREPARE OUTPUT
   //////////////////////////////////////////////////////////////////////////////
@@ -243,15 +251,15 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
 
   // The following lists determine the particles of interest for each group of fields
   // later they will come from a config file
-  vars.addMomentaFieldsPerParticle({11, 2212, 2112, 211, -211, 321, -321});
-  vars.addDetectorFieldsPerParticle({11, 22, 2212, 2112, 211, -211, 321, -321});
-  vars.addChi2PidFieldsPerParticle({11, 2212, 2112, 211, -211, 321, -321});
-  vars.addSectorFieldsPerParticle({11, 22, 2212, 2112, 211, -211, 321, -321});
-  vars.addDCFields();
+  vars.AddMomentaFieldsPerParticle({11, 2212, 2112, 211, -211, 321, -321});
+  vars.AddDetectorFieldsPerParticle({11, 22, 2212, 2112, 211, -211, 321, -321});
+  vars.AddChi2PidFieldsPerParticle({11, 2212, 2112, 211, -211, 321, -321});
+  vars.AddSectorFieldsPerParticle({11, 22, 2212, 2112, 211, -211, 321, -321});
+  vars.AddDCFields();
 
   // Create Writer that takes ownership of the model
   std::string tempfile = "/tmp/rntuple.root";
-  auto file = ROOT::RNTupleWriter::Recreate(vars.MoveModel(), "nTupleName", tempfile);
+  auto file = ROOT::RNTupleWriter::Recreate(std::move(vars.Model()), "nTupleName", tempfile);
 
   // Event loop
   //////////////////////////////////////////////////////////////////////////////
@@ -267,14 +275,21 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
     vars.SetValue("eventnumber", c12->runconfig()->getEvent());
     vars.SetValue("helicity", c12->event()->getHelicity());
     vars.SetValue("beam_charge", c12->event()->getBeamCharge());
+    
+    // Clear Vector Fields
+    vars.ResetVectorFields();                 // clear and reserve all vector fields
 
-    // Apply Filter & Cuts here
-    ig.GetFilters().doAllFilters();
-    // ig.GetTransformers().doAllCorrections();
+    // ====================== EVENT CUTS ======================
+    // do cuts on event level here if needed
+    // something like EventBuilderFilter for example
+    
+    // maybe Iguana?
+    // Filter here
+    // ig.GetFilters().doAllFilters();
 
     // Correct here
-
-    vars.ResetVectorFields();                 // clear and reserve all vector fields
+    // ig.GetTransformers().doAllCorrections();
+    
     auto particles = c12->getDetParticles();  // All detected particles in the event
     for (auto&& p : particles)                // 3.4s in loop
     {
@@ -283,17 +298,31 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
         // std::cout << "Unknown particle with PDG code " << p->getPid() << " found, skipping..." << std::endl;
         continue;
       }
+      
+      // Todo: helicity==inbending/outbending?
+      // c12->runconfig()->getSolenoid(); // is this inbending/outbending?
+      // c12->runconfig()->getTorus();    // or this?
+      // c12->event()->getHelicity();     // or this?
+      
+      // ====================== PARTICLE CUTS ======================
+      // if (!cuts::CC_nphe_cut(p)) continue; // future
+      
+
+      // ===========================================================
+      //                        Collect data
+      // ===========================================================
+      TParticlePDG* pdg = pdg_db->GetParticle(p->getPid());
+      if (pdg == nullptr) continue;
 
       // ====================== MOMENTUM FIELDS ======================
       // now we know particle_enum is a known particle, we can get away without std::optionals
       if (vars.fParticlesOfInterestForMomentumFields.contains(p->getPid())) {
-        double m0 = pdg::get(pdg::mass, p->getPid()).value_or(0.0);  // in GeV
         vars.AppendValue("p4_" + name + "_px", static_cast<double>(p->par()->getPx()));
         vars.AppendValue("p4_" + name + "_py", static_cast<double>(p->par()->getPy()));
         vars.AppendValue("p4_" + name + "_pz", static_cast<double>(p->par()->getPz()));
         vars.AppendValue("p4_" + name + "_E",
                          static_cast<double>(std::sqrt(std::pow(p->par()->getPx(), 2) + std::pow(p->par()->getPy(), 2) +
-                                                       std::pow(p->par()->getPz(), 2) + std::pow(m0, 2))));
+                                                       std::pow(p->par()->getPz(), 2) + std::pow(pdg->Mass(), 2))));
       }
       // ====================== DETECTOR FIELDS ======================
       if (vars.fParticlesOfInterestForDetectorFields.contains(p->getPid())) {
@@ -364,13 +393,13 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   ROOT::RDF::RNode df = ROOT::RDF::FromRNTuple("nTupleName", tempfile.c_str());
   std::cout << std::format(" {:.1f}s", duration_cast<milliseconds>(steady_clock::now() - t2).count() / 1000.)
             << std::endl;
+
+  auto t3 = steady_clock::now();
+  std::cout << std::format("Writing RDataFrame into '{}'...", outputfile) << std::flush;
   ROOT::RDF::RSnapshotOptions opts;
   opts.fOverwriteIfExists = true;
   opts.fVector2RVec = false;
   opts.fOutputFormat = ROOT::RDF::ESnapshotOutputFormat::kTTree;
-
-  auto t3 = steady_clock::now();
-  std::cout << std::format("Writing RDataFrame into '{}'...", outputfile) << std::flush;
   df.Snapshot("out_tree", outputfile, df.GetColumnNames(), opts);  // 6.5s
   std::remove(tempfile.c_str());                                   // Delete the temporary file
   std::cout << std::format(" {:.1f}s", duration_cast<milliseconds>(steady_clock::now() - t3).count() / 1000.)

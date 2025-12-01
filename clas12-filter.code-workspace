@@ -3,8 +3,15 @@
 		{
 			"path": "."
 		},
-		{"path": "/opt/CLAS",},
-		{"path": "/opt/CERN_ROOT_6.36/source",},
+		{
+			"path": "/home/simon/Repos/clas12-filter-doc"
+		},
+		{
+			"path": "/opt/CLAS",
+		},
+		{
+			"path": "/opt/CERN_ROOT_6.36/source",
+		},
 		// {"path": "/opt/CLAS",},
 		// {"path": "/opt/CLAS",},
 		// {"path": "/opt/CLAS",},
@@ -131,7 +138,10 @@
 			"__nullptr": "cpp",
 			"shared_mutex": "cpp",
 			"ntpl014_framework.C": "cpp",
-			"future": "cpp"
+			"future": "cpp",
+			"typeindex": "cpp",
+			"*.icxx": "cpp",
+			"__locale": "cpp"
 		}
 	}
 }
