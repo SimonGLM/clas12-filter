@@ -225,10 +225,10 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
 
   // // Prepare Iguana Algorithm 
   //////////////////////////////////////////////////////////////////////////////
-  iguana::AlgorithmSequence seq;
-  seq.Add<iguana::clas12::ZVertexFilter>("clas12::ZVertexFilter"); // Filter for PIDs from EventBuilder
-  seq.SetOption("pid_filter", "log", "info");
-  seq.Start();
+  // iguana::AlgorithmSequence seq;
+  // seq.Add<iguana::clas12::ZVertexFilter>("clas12::ZVertexFilter"); // Filter for PIDs from EventBuilder
+  // // seq.SetOption("pid_filter", "log", "info");
+  // seq.Start();
 
   // Preparations to have vec4's ready for iguana transforms
   auto pdg_db = TDatabasePDG::Instance();
