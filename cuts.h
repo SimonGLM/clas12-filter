@@ -28,10 +28,6 @@ bool delta_vz_cut(clas12::region_particle* p, double reference_vertex_z) {
   return tolerances.lower < delta_vz && delta_vz < tolerances.upper;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-//                      ELECTRON CUTS (FORWARD DETECTOR)                      //
-////////////////////////////////////////////////////////////////////////////////
-
 bool CC_nphe_cut(clas12::region_particle* p) {
   double nphe_min = 2;
   return p->che(clas12::HTCC)->getNphe() > nphe_min;
@@ -85,7 +81,7 @@ bool EC_sampling_fraction_cut(clas12::region_particle* p, bool inbending = false
              .sigma = {-6.99914e-05, 0.000152666, 0.000164229, -0.000133009, -3.68797e-05, -0.000107538}};
   BandParameterLUT band_fall2018_outb = {band_p0, band_p1, band_p2, band_p3};
 
-  //   // spring2019 inb:
+  //   // spring2019:
   band_p0 = {.mean = {0.11253, 0.113735, 0.112401, 0.115128, 0.113048, 0.1147},
              .sigma = {0.0193473, 0.0351352, 0.0234448, 0.0238342, 0.0382829, 0.0125166}};
   band_p1 = {.mean = {-0.0689836, -0.044216, -0.160555, 0.108512, -0.153003, -0.0997027},
@@ -94,7 +90,7 @@ bool EC_sampling_fraction_cut(clas12::region_particle* p, bool inbending = false
              .sigma = {-0.00222507, -0.00549204, -0.00353928, -0.00347335, -0.00623149, -0.00186593}};
   band_p3 = {.mean = {-0.000920149, -0.000977549, -0.00128293, -0.000728472, -0.000957354, -0.00106035},
              .sigma = {0.000165603, 0.000440174, 0.000274543, 0.000260158, 0.000508396, 0.000206116}};
-  BandParameterLUT band_spring2019_inb = {band_p0, band_p1, band_p2, band_p3};
+  BandParameterLUT band_spring2019 = {band_p0, band_p1, band_p2, band_p3};
 
   //   // MC inb:
   band_p0 = {.mean = {0.118444, 0.118383, 0.118318, 0.118531, 0.117475, 0.119179},
@@ -120,10 +116,10 @@ bool EC_sampling_fraction_cut(clas12::region_particle* p, bool inbending = false
   // // Example access:
   // int parameter=1;
   // band_fall2018_inb[parameter].mean[sector];
-
+  
   BandParameterLUT* band_LUT;
   if (spring2019)
-    band_LUT = &band_spring2019_inb;
+    band_LUT = &band_spring2019;
   else if (simulation) {
     band_LUT = inbending ? &band_simulation_inb : &band_simulation_outb;
   } else {
@@ -131,19 +127,19 @@ bool EC_sampling_fraction_cut(clas12::region_particle* p, bool inbending = false
   }
 
   // helper variables to make the formula more readable
-  const auto& band_p0 = band_LUT->at(0);
-  const auto& band_p1 = band_LUT->at(1);
-  const auto& band_p2 = band_LUT->at(2);
-  const auto& band_p3 = band_LUT->at(3);
+  const auto& band_par0 = band_LUT->at(0);
+  const auto& band_par1 = band_LUT->at(1);
+  const auto& band_par2 = band_LUT->at(2);
+  const auto& band_par3 = band_LUT->at(3);
   int sector = p->cal(clas12::PCAL)->getSector() - 1;
   double P = p->par()->getP();
 
   double sigma_range = 3.5;
 
   // calculate band
-  double mean = band_p0.mean[sector] * (1 + P / std::sqrt(P * P + band_p1.mean[sector]));
-  double sigma = band_p0.sigma[sector] + band_p1.sigma[sector] / std::sqrt(P) + band_p2.sigma[sector] * P +
-                 band_p3.sigma[sector] * P * P;
+  double mean = band_par0.mean[sector] * (1 + P / std::sqrt(P * P + band_par1.mean[sector]));
+  double sigma = band_par0.sigma[sector] + band_par1.sigma[sector] / std::sqrt(P) + band_par2.sigma[sector] * P +
+                 band_par3.sigma[sector] * P * P;
   // calulate cut limits
   double upper_lim_total = mean + 3.5 * sigma;
   double lower_lim_total = mean - 3.5 * sigma;
@@ -238,7 +234,7 @@ bool EC_sampling_fraction_cut(clas12::region_particle* p, bool inbending = false
   const TriangleParameterLUT TRI_SIMULATION_OUTB = {tri_sec1, tri_sec2, tri_sec3, tri_sec4, tri_sec5, tri_sec6};
 
   // calculate energy bin
-  double P = p->par()->getP();
+  // double P = p->par()->getP();
   int energy_bin = P <= 3 ? 0 : P <= 4 ? 1 : P <= 5 ? 2 : P <= 6 ? 3 : P <= 7 ? 4 : P <= 8 ? 5 : P <= 9 ? 6 : 7;
 
   const TriangleParameterLUT* tri_LUT;
@@ -250,11 +246,11 @@ bool EC_sampling_fraction_cut(clas12::region_particle* p, bool inbending = false
     tri_LUT = inbending ? &TRI_FALL2018_INB : &TRI_FALL2018_OUTB;
   }
   const TwoParamsAllEnergies& tri_params = tri_LUT->at(p->cal(clas12::PCAL)->getSector() - 1);
-  const double& tri_p0 = tri_params.p0[energy_bin];
-  const double& tri_p1 = tri_params.p1[energy_bin];
+  const double& tri_par0 = tri_params.p0[energy_bin];
+  const double& tri_par1 = tri_params.p1[energy_bin];
 
   bool pass_triangle =
-      p->cal(clas12::PCAL)->getEnergy() / P > (tri_p1 - tri_p0 * p->cal(clas12::ECIN)->getEnergy() / P);
+      p->cal(clas12::PCAL)->getEnergy() / P > (tri_par1 - tri_par0 * p->cal(clas12::ECIN)->getEnergy() / P);
 
 
   //////////////////////////////////////////////////////////////////////////////
@@ -454,7 +450,7 @@ bool phot_EC_sampling_fraction_cut(clas12::region_particle* p) {
 bool phot_EC_outer_vs_EC_inner_cut(clas12::region_particle* p) {
   throw not_implemented_error("[phot_EC_outer_vs_EC_inner_cut] Not implemented yet.");
   double edep_min = 0.01;
-  return (p->cal(clas12::ECIN)->getEnergy() + p->cal(clas12::ECOUT)->getEnergy()) > edep_min:
+  return (p->cal(clas12::ECIN)->getEnergy() + p->cal(clas12::ECOUT)->getEnergy()) > edep_min;
 }
 
 bool neutr_beta_cut(clas12::region_particle* p, int run) {
