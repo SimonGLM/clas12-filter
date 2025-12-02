@@ -193,13 +193,32 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   // hipo::dictionary dict = c12->getDictionary();
   // dict.show(); // Print all bank names
 
-  // QADB
+  //////////////////////////////////////////////////////////////////////////////
+  // CCDB + RCDB + QADB
   //////////////////////////////////////////////////////////////////////////////
   clas12::clas12databases db;
-  c12->connectDataBases(&db);
+  c12->connectDataBases(&db); 
+  char* CCDB_CONNECTION=getenv("CCDB_CONNECTION");
+  char* RCDB_CONNECTION=getenv("RCDB_CONNECTION");
+  if(CCDB_CONNECTION==NULL){
+    std::cout <<"[CCDB] Environment variable CCDB_CONNECTION not set! Trying remote connection..." << std::endl;
+    c12->db()->SetCCDBRemoteConnection();
+  } else {
+    c12->db()->SetCCDBLocalConnection(CCDB_CONNECTION);
+  }
+  if(RCDB_CONNECTION==NULL){
+    std::cout <<"[RCDB] Environment variable RCDB_CONNECTION not set! Trying remote connection..." << std::endl;
+    c12->db()->SetRCDBRemoteConnection();
+  }else {
+    c12->db()->SetRCDBLocalConnection(RCDB_CONNECTION);
+  }
+  //////////////////////////////////////////////////////////////////////////////
+  // Apply QA requirements
   c12->applyQA("pass2");
-  // c12->db()->qadb_requireOkForAsymmetry(true);  // what is this?
+  c12->db()->qadb_requireOkForAsymmetry(true); // From config
+  c12->db()->qadb_requireGolden(true); // From config
   // Is this needed in general or specific for every ana task?
+  // Specific for ana task. Should be configurable from config.
 
   // Clas12 Filters
   // c12->AddExactPid(11, 1);
@@ -299,13 +318,14 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
         continue;
       }
       
-      // Todo: helicity==inbending/outbending?
-      // c12->runconfig()->getSolenoid(); // is this inbending/outbending?
-      // c12->runconfig()->getTorus();    // or this?
-      // c12->event()->getHelicity();     // or this?
-      
       // ====================== PARTICLE CUTS ======================
-      if (!cuts::CC_nphe_cut(p)) continue;
+      // if (electron)
+      //   if (!electron_tests)
+      //     continue;
+      // if (proton)
+      //   if (!proton_tests)
+      //     continue;
+      // etc.
       
 
       // ===========================================================
