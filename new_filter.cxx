@@ -287,6 +287,9 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   auto t0 = steady_clock::now();
   auto last_update = t0;
 
+  // General conditions
+  bool inbending = c12->runconfig()->getTorus()>0 ? true : false; // or from RCDB?
+
   fmt::print("Starting event loop for {} events...\n", events);
   while (c12->next() && ((events != -1 && count < events) || (events == -1)))  // 15.4s in Loop (c12.next() 8.8s)
   {
