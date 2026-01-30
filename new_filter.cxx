@@ -220,35 +220,6 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   // Is this needed in general or specific for every ana task?
   // Specific for ana task. Should be configurable from config.
 
-  // Clas12 Filters
-  // c12->AddExactPid(11, 1);
-  // c12->AddAtLeastPid(11, 1);
-  // c12->AddZeroOfRestPid();
-
-
-  // // Prepare Clas12 Iguana Filters
-  //////////////////////////////////////////////////////////////////////////////
-  clas12root::Iguana ig{};
-  ig.SetClas12(&c12);
-  // ------ Filters ------
-  ig.GetFilters().Use("clas12::zVertexFilter");
-  // ig.GetFilters().Use("clas12::FiducialFilter");   // Purged from source tree
-  // ig.GetFilters().Use("clas12::PhotonGBTFilter");  // Purged from source tree
-  // ------ Corrections ------
-  // ig.GetTransformers().Use("clas12::MomentumCorrection");  // renamed in Iguana but not in clas12root::Iguana
-  // ig.GetTransformers().Use("clas12::FTEnergyCorrection");  // therefore wholy inoperable
-  // ------ Creators ------
-  // ig.GetCreators().Use("physics::InclusiveKinematics");
-  ig.SetOptionAll("log", "debug");
-  ig.Start();
-
-  // // Prepare Iguana Algorithm 
-  //////////////////////////////////////////////////////////////////////////////
-  // iguana::AlgorithmSequence seq;
-  // seq.Add<iguana::clas12::ZVertexFilter>("clas12::ZVertexFilter"); // Filter for PIDs from EventBuilder
-  // // seq.SetOption("pid_filter", "log", "info");
-  // seq.Start();
-
   // Preparations to have vec4's ready for iguana transforms
   auto pdg_db = TDatabasePDG::Instance();
   FourVector p4_el(0, 0, 0, pdg_db->GetParticle(11)->Mass());
