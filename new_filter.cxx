@@ -68,17 +68,22 @@ std::string pdg_name(const int& pdg) {
 class DynamicVarStore {
  public:
   // Constructor that takes ownership of the model
-  DynamicVarStore(std::unique_ptr<ROOT::RNTupleModel> model) : fModel(std::move(model)) {}
+  DynamicVarStore(std::unique_ptr<ROOT::RNTupleModel> model, bool verbose = false)
+      : fModel(std::move(model)), verbose(verbose) {
+    if (this->verbose) std::cout << "[DynamicVarStore] Created with model." << std::endl;
+  }
 
   // Build the model by adding fields of type T with the given name
   template <typename T>
   void AddField(const std::string& name) {
+    if (this->verbose) std::cout << std::format("[DynamicVarStore] Adding field '{}'.", name) << std::endl;
     // Create field in the model and store the shared_ptr<T> in the map
     fMap[name] = fModel->MakeField<T>(name);
   }
 
   template <typename T>
   void SetValue(const std::string& name, const T& value) {
+    if (this->verbose) std::cout << std::format("[DynamicVarStore] Setting field value '{}' .", name) << std::endl;
     if (!IsField(name)) throw std::invalid_argument(std::format("Field '{}' does not exist in DynamicVarStore", name));
     // Get the shared_ptr<T> from the map, dereference it and set the value
     // no `std::get<...>(...).reset(value)` here as that would change the address that is pointed to
@@ -86,6 +91,7 @@ class DynamicVarStore {
   }
 
   void ResetVectorFields() {
+    if (this->verbose) std::cout << "[DynamicVarStore] Resetting vector fields." << std::endl;
     // Get the shared_ptr<std::vector<T>> from the map and clear the vector
     for (const auto& [name, ptr] : fMap) {
       std::visit(
@@ -171,6 +177,7 @@ class DynamicVarStore {
   bool IsField(const std::string& name) { return fMap.contains(name); }
 
  private:
+  bool verbose = false;
   // Each entry stores a shared_ptr<T> of one of the supported types
   using variant_type = std::variant<std::shared_ptr<int>, std::shared_ptr<float>, std::shared_ptr<double>,
                                     std::shared_ptr<std::vector<int>>, std::shared_ptr<std::vector<float>>,
@@ -214,6 +221,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   }
   //////////////////////////////////////////////////////////////////////////////
   // Apply QA requirements
+  std::cout << "[QADB] Applying QA requirements..." << std::endl;
   c12->applyQA("pass2");
   c12->db()->qadb_requireOkForAsymmetry(true); // From config
   c12->db()->qadb_requireGolden(true); // From config
@@ -232,6 +240,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
 
   // // PREPARE OUTPUT
   //////////////////////////////////////////////////////////////////////////////
+  std::cout << "[DynamicVarStore] Initializing dynamic data structure..." << std::endl;
   std::unique_ptr<ROOT::RNTupleModel> model = ROOT::RNTupleModel::Create();
   DynamicVarStore vars(std::move(model));
 
@@ -249,6 +258,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
 
   // Create Writer that takes ownership of the model
   std::string tempfile = "/tmp/rntuple.root";
+  std::cout << "[RNTuple] Creating RNTuple writer from model..." << std::endl;
   auto file = ROOT::RNTupleWriter::Recreate(std::move(vars.Model()), "nTupleName", tempfile);
 
   // Event loop
@@ -259,9 +269,16 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   auto last_update = t0;
 
   // General conditions
-  bool inbending = c12->runconfig()->getTorus()>0 ? true : false; // or from RCDB?
+  std::cout << "[C12] Retrieving general run conditions..." << std::endl;
 
-  fmt::print("Starting event loop for {} events...\n", events);
+  // THESE SEGFAULT !!!!
+  // bool inbending = c12->runconfig()->getTorus() > 0 ? true : false;  // or from RCDB?
+  // int runnum = c12->runconfig()->getRun();
+  // !!!!!!!!!!!!!!!!!!!
+  bool inbending = false;  // temporary
+
+  std::cout << std::format("Starting event loop for {} events...", events) << std::endl;
+
   while (c12->next() && ((events != -1 && count < events) || (events == -1)))  // 15.4s in Loop (c12.next() 8.8s)
   {
     // access variant stored in map with std::get<> and dereference the shared_ptr to set the that it holds.
