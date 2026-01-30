@@ -20,6 +20,7 @@
 
 // ROOT
 #include <Math/LorentzVector.h>
+#include <Math/Vector4D.h>
 #include <Rtypes.h>
 #include <TDatabasePDG.h>
 #include <TTree.h>
@@ -38,12 +39,11 @@
 #include <region_particle.h>
 using region_part_ptr = clas12::region_particle*;  // needed for compilation
 
-#include <Iguana.h>                                // needs to be included after clas12reader.h
-#include <iguana/algorithms/AlgorithmSequence.h>
-#include <iguana/algorithms/clas12/EventBuilderFilter/Algorithm.h>
-
 // Own
 #include "cuts.h"
+#include "particle_selector.h"
+// #include "dynamicvarstore.h"
+// #include "helpers.h"
 
 using namespace std::chrono;
 using FourVector = ROOT::Math::PxPyPzMVector;
@@ -188,6 +188,7 @@ class DynamicVarStore {
   std::unique_ptr<ROOT::RNTupleModel> fModel;
 };
 
+//////////////////////////////////////////////////////////////////////////////
 // No argument overload if used without arguments
 void new_filter() { std::cout << "Called without arguments." << std::endl; }
 
@@ -205,26 +206,26 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   //////////////////////////////////////////////////////////////////////////////
   clas12::clas12databases db;
   c12->connectDataBases(&db); 
-  char* CCDB_CONNECTION=getenv("CCDB_CONNECTION");
-  char* RCDB_CONNECTION=getenv("RCDB_CONNECTION");
-  if(CCDB_CONNECTION==NULL){
-    std::cout <<"[CCDB] Environment variable CCDB_CONNECTION not set! Trying remote connection..." << std::endl;
+  char* CCDB_CONNECTION = getenv("CCDB_CONNECTION");
+  char* RCDB_CONNECTION = getenv("RCDB_CONNECTION");
+  if (CCDB_CONNECTION == NULL) {
+    std::cout << "[CCDB] Environment variable CCDB_CONNECTION not set! Trying remote connection..." << std::endl;
     c12->db()->SetCCDBRemoteConnection();
   } else {
     c12->db()->SetCCDBLocalConnection(CCDB_CONNECTION);
   }
-  if(RCDB_CONNECTION==NULL){
-    std::cout <<"[RCDB] Environment variable RCDB_CONNECTION not set! Trying remote connection..." << std::endl;
+  if (RCDB_CONNECTION == NULL) {
+    std::cout << "[RCDB] Environment variable RCDB_CONNECTION not set! Trying remote connection..." << std::endl;
     c12->db()->SetRCDBRemoteConnection();
-  }else {
+  } else {
     c12->db()->SetRCDBLocalConnection(RCDB_CONNECTION);
   }
   //////////////////////////////////////////////////////////////////////////////
   // Apply QA requirements
   std::cout << "[QADB] Applying QA requirements..." << std::endl;
   c12->applyQA("pass2");
-  c12->db()->qadb_requireOkForAsymmetry(true); // From config
-  c12->db()->qadb_requireGolden(true); // From config
+  // c12->db()->qadb_requireOkForAsymmetry(true);  // From config
+  // c12->db()->qadb_requireGolden(true);          // From config
   // Is this needed in general or specific for every ana task?
   // Specific for ana task. Should be configurable from config.
 
@@ -287,7 +288,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
     vars.SetValue("beam_charge", c12->event()->getBeamCharge());
     
     // Clear Vector Fields
-    vars.ResetVectorFields();                 // clear and reserve all vector fields
+    vars.ResetVectorFields();  // clear and reserve all vector fields
 
     // ====================== EVENT CUTS ======================
     // do cuts on event level here if needed
@@ -317,7 +318,6 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
       //   if (!proton_tests)
       //     continue;
       // etc.
-      
 
       // ===========================================================
       //                        Collect data
