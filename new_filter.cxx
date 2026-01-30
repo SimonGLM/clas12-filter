@@ -12,6 +12,7 @@
 */
 
 // System
+// legacy libformat consider std::format in future
 #include <fmt/format.h>
 
 #include <chrono>
@@ -43,22 +44,10 @@ using region_part_ptr = clas12::region_particle*;  // needed for compilation
 #include "cuts.h"
 #include "particle_selector.h"
 // #include "dynamicvarstore.h"
-// #include "helpers.h"
+#include "helpers.h"
 
 using namespace std::chrono;
 using FourVector = ROOT::Math::PxPyPzMVector;
-
-std::string pdg_name(const int& pdg) {
-  return pdg == 11     ? "ele"
-         : pdg == 22   ? "phot"
-         : pdg == 2212 ? "prot"
-         : pdg == 2112 ? "neutr"
-         : pdg == 211  ? "pip"
-         : pdg == -211 ? "pim"
-         : pdg == 321  ? "Kp"
-         : pdg == -321 ? "Km"
-                       : "unknown";
-};
 
 // A helper class that wraps an RNTupleModel and allows building it up dynamically
 // by adding fields of various types identified by their names as strings.
