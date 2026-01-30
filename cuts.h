@@ -1,3 +1,5 @@
+#pragma once
+#include <Math/Vector3D.h>
 #include <clas12defs.h>
 #include <region_particle.h>
 
@@ -14,9 +16,84 @@ struct bounds {
 };
 
 namespace cuts {
+namespace generic {
+bool forward_detector_cut(clas12::region_particle* p) {
+  int det = abs(p->par()->getStatus());
+  // clas12::FD<= det && det < clas12::CD;  // enum missmatch?
+  return (2000 <= det && det < 4000);
+}
+
+bool central_detector_cut(clas12::region_particle* p) {
+  int det = abs(p->par()->getStatus());
+  return (4000 <= det && det < 5000);
+}
+
+bool forward_tagger_cut(clas12::region_particle* p) {
+  int det = abs(p->par()->getStatus());
+  return (1000 <= det && det < 2000);
+}
+
 bool PID_cut(clas12::region_particle* p, int pid) { return p->par()->getPid() == pid; }
 
 bool charge_cut(clas12::region_particle* p, int charge) { return p->par()->getCharge() == charge; }
+
+// from tbhayward/clas12_analysis_software
+// bool vertex_cut(clas12::region_particle* p, int runnum) {
+//   int charge = p->par()->getCharge();
+//   float vz = p->par()->getVz();
+
+//   //                          pos     neg   charge
+//   using bounds_pair = std::pair<bounds, bounds>;
+//   bounds_pair bounds_spring18_inb = {{-7.879, 1.515}, {-6.0606, 1.8182}};
+//   bounds_pair bounds_spring18_outb = {{-6.6667, 2.7273}, {-7.273, 0.9091}};
+//   bounds_pair bounds_fall18_inb = {{-8.485, 0.606}, {-6.364, 1.515}};
+//   bounds_pair bounds_fall18_outb = {{-6.970, 1.818}, {-7.879, 0.303}};
+//   bounds_pair bounds_spring19_inb = bounds_fall18_inb;
+//   bounds_pair bounds_summer22 = {{-9.394, -0.606}, {-7.576, 0.303}};
+//   bounds_pair bounds_fall22_spring23 = {{-8.788, 0.303}, {-5.758, 1.515}};
+//   bounds fallback = {-9, 2};
+
+//   bounds_pair vz_bounds_pair;
+//   if (runnum == 11) {
+//     vz_bounds_pair = {{-10, 1.5}, {-9, 2}};
+//   } else if ((runnum >= 3173 && runnum >= 3293) || (runnum >= 3863 && runnum <= 3987))  // spring18 outb
+//   {
+//     vz_bounds_pair = bounds_spring18_outb;
+//   } else if (runnum >= 4003 && runnum <= 4325)  // spring18 inb
+//   {
+//     vz_bounds_pair = bounds_spring18_inb;
+//   } else if (runnum >= 5032 && runnum <= 5419)  // fall18 inbending
+//   {
+//     vz_bounds_pair = bounds_fall18_inb;
+//   } else if (runnum >= 5422 && runnum <= 5666)  // fall18 outbending
+//   {
+//     vz_bounds_pair = bounds_fall18_outb;
+//   } else if (runnum >= 6616 && runnum <= 6783)  // spring19 inbending
+//   {
+//     vz_bounds_pair = bounds_spring19_inb;
+//   } else if (runnum >= 16043 && runnum <= 16772)  // su22
+//   {
+//     vz_bounds_pair = bounds_summer22;
+//   } else if (runnum >= 16843 && runnum <= 17811)  // fa22 & sp32
+//   {
+//     vz_bounds_pair = bounds_fall22_spring23;
+//   }
+
+//   bounds vz_bounds = charge > 0   ? vz_bounds_pair.first
+//                      : charge < 0 ? vz_bounds_pair.second
+//                                   : fallback;  // choose from charge or fallback for neutral
+
+//   return vz_bounds.lower < vz && vz < vz_bounds.upper;
+// }
+}  // namespace generic
+
+// reject events with less then 2 photoelectrons in the HTCC
+bool nphe_cut(clas12::region_particle* p) {
+  double nphe_min = 2;
+  return p->che(clas12::HTCC)->getNphe() > nphe_min;
+}
+
+namespace fiducial {}  // namespace fiducial
 
 // We need a good reference vertex z for the proton delta vz cut.
 // The old way is searching for the highest momentum electron in the event
@@ -28,16 +105,11 @@ bool delta_vz_cut(clas12::region_particle* p, double reference_vertex_z) {
   return tolerances.lower < delta_vz && delta_vz < tolerances.upper;
 }
 
-bool CC_nphe_cut(clas12::region_particle* p) {
-  double nphe_min = 2;
-  return p->che(clas12::HTCC)->getNphe() > nphe_min;
-}
-
 bool EC_outer_vs_EC_inner_cut(clas12::region_particle* p, int tightness) {
-  if (tightness > 1 or tightness < 3)
+  if (tightness != 1 and tightness != 2 and tightness != 3)
     throw std::runtime_error("[EC_outer_vs_EC_inner_cut] tightness must be 1, 2, or 3.");
 
-  std::array<double, 3> edep_min = {0.06, 0.07, .09};
+  std::array<double, 3> edep_min = {0.06, 0.07, 0.09};
 
   return p->cal(clas12::PCAL)->getEnergy() > edep_min[tightness - 1];
 }
@@ -46,7 +118,6 @@ bool EC_outer_vs_EC_inner_cut(clas12::region_particle* p, int tightness) {
 // TODO: Maybe remove LUT in favour to RCDB or CCDB, if possible ?
 bool EC_sampling_fraction_cut(clas12::region_particle* p, bool inbending = false, bool simulation = false,
                               bool spring2019 = false) {
-
   //////////////////////////////////////////////////////////////////////////////
   // band cut on SF PCAL (array entries are sectors)
   //////////////////////////////////////////////////////////////////////////////
@@ -116,7 +187,7 @@ bool EC_sampling_fraction_cut(clas12::region_particle* p, bool inbending = false
   // // Example access:
   // int parameter=1;
   // band_fall2018_inb[parameter].mean[sector];
-  
+
   BandParameterLUT* band_LUT;
   if (spring2019)
     band_LUT = &band_spring2019;
@@ -252,7 +323,6 @@ bool EC_sampling_fraction_cut(clas12::region_particle* p, bool inbending = false
   bool pass_triangle =
       p->cal(clas12::PCAL)->getEnergy() / P > (tri_par1 - tri_par0 * p->cal(clas12::ECIN)->getEnergy() / P);
 
-
   //////////////////////////////////////////////////////////////////////////////
   // threshold cut on SF PCAL
   //////////////////////////////////////////////////////////////////////////////
@@ -263,7 +333,7 @@ bool EC_sampling_fraction_cut(clas12::region_particle* p, bool inbending = false
 }
 
 bool EC_hit_position_fiducial_cut_homogeneous(clas12::region_particle* p, int tightness, bool inbending) {
-  if (tightness > 1 or tightness < 3)
+  if (tightness != 1 and tightness != 2 and tightness != 3)
     throw std::runtime_error("[EC_hit_position_fiducial_cut_homogeneous] tightness must be 1, 2, or 3.");
 
   // Cut using the natural directions of the scintillator bars/ fibers:
@@ -285,23 +355,23 @@ bool EC_hit_position_fiducial_cut_homogeneous(clas12::region_particle* p, int ti
   using EC_fiducial_bounds_vw_LUT = std::array<std::array<bounds_vw, 3>, 2>;
 
   const EC_fiducial_bounds_vw_LUT EC_FIDUCIAL_VW_LIMITS_LUT = {{// inbending
-                                                         {{
-                                                             // Loose
-                                                             {{9.0, 400.0}, {9.0, 400.0}},
-                                                             // Medium
-                                                             {{14.0, 400.0}, {14.0, 400.0}},
-                                                             // Tight
-                                                             {{19.0, 400.0}, {19.0, 400.0}},
-                                                         }},
-                                                         // outbending
-                                                         {{
-                                                             // Loose
-                                                             {{9.0, 400.0}, {9.0, 400.0}},
-                                                             // Medium
-                                                             {{14.0, 400.0}, {14.0, 400.0}},
-                                                             // Tight
-                                                             {{19.0, 400.0}, {19.0, 400.0}},
-                                                         }}}};
+                                                                {{
+                                                                    // Loose
+                                                                    {{9.0, 400.0}, {9.0, 400.0}},
+                                                                    // Medium
+                                                                    {{14.0, 400.0}, {14.0, 400.0}},
+                                                                    // Tight
+                                                                    {{19.0, 400.0}, {19.0, 400.0}},
+                                                                }},
+                                                                // outbending
+                                                                {{
+                                                                    // Loose
+                                                                    {{9.0, 400.0}, {9.0, 400.0}},
+                                                                    // Medium
+                                                                    {{14.0, 400.0}, {14.0, 400.0}},
+                                                                    // Tight
+                                                                    {{19.0, 400.0}, {19.0, 400.0}},
+                                                                }}}};
   // overrides for sector #4 (idx=3)
   const bounds_vw LOOSE_SECTOR4_OVERRIDES = {13.5, 400.0, 9.0, 400.0};
 
@@ -318,7 +388,6 @@ bool EC_hit_position_fiducial_cut_homogeneous(clas12::region_particle* p, int ti
 
 bool DC_fiducial_cut_edge(clas12::region_particle* p, int region, bool inbending) {
   // throw not_implemented_error("DC_fiducial_cut_edge not implemented");
-  if (region < 1 or region > 3) throw std::runtime_error("[DC_fiducial_cut_edge] `region` must be 1, 2, or 3");
 
   using DCEdgeCuts = struct {
     std::array<double, 3> inbending;
@@ -329,9 +398,9 @@ bool DC_fiducial_cut_edge(clas12::region_particle* p, int region, bool inbending
       {211, {{2.5, 2.5, 9.0}, {3.5, 2.5, 6.5}}},  {-211, {{3.5, 3.0, 7.0}, {2.5, 2.5, 10.0}}},
       {321, {{2.5, 2.0, 9.0}, {3.5, 2.5, 6.5}}},  {-321, {{3.5, 2.5, 5.0}, {2.5, 2.5, 10.0}}}};
 
-  if (!PID_cut(p, 11) && !PID_cut(p, 2122) && !PID_cut(p, 211) && !PID_cut(p, -211) && !PID_cut(p, 321) &&
-      !PID_cut(p, -321)) {
-    throw std::runtime_error("[DC_fiducial_cut_edge] Attempting cut on unkown PID. Cut on PID first.");
+  if (!cuts::generic::PID_cut(p, 11) && !cuts::generic::PID_cut(p, 2122) && !cuts::generic::PID_cut(p, 211) &&
+      !cuts::generic::PID_cut(p, -211) && !cuts::generic::PID_cut(p, 321) && !cuts::generic::PID_cut(p, -321)) {
+    throw std::domain_error("[DC_fiducial_cut_edge] Attempting cut on unkown PID. Cut on PID first.");
   }
   // get iterator to arrays in the DCedge_LUT
   auto it = DCedge_LUT.find(p->getPid());
@@ -340,8 +409,6 @@ bool DC_fiducial_cut_edge(clas12::region_particle* p, int region, bool inbending
   // select edge cut based on inbending or outbending
   double edge_cut = inbending ? it->second.inbending[region - 1] : it->second.outbending[region - 1];
 
-  // Is switching on region correct? And is clas12::DC[1,2,3] correct layers?
-  // select_electron calls this cut with region = 1,2,3, does that translate to DC1,DC3, DC6 correctly?
   double edge_val = 0;
   switch (region) {
     case 1:
@@ -354,6 +421,8 @@ bool DC_fiducial_cut_edge(clas12::region_particle* p, int region, bool inbending
       edge_val = p->traj(clas12::DC, clas12::DC6)->getEdge();
       break;
     default:
+      throw std::domain_error("This particle's region \'" + std::to_string(region) +
+                              " is not 1,2 or 3. Check what getRegion really returns in code.");
       break;
   }
 
@@ -421,7 +490,8 @@ bool FT_eid_FTHODO_fiducial_cut(clas12::region_particle* p) {
 bool FT_eid_energy_vs_radius_cut([[maybe_unused]] clas12::region_particle* _) { return true; }
 
 bool phot_beta_cut(clas12::region_particle* p, int tightness) {
-  if (tightness > 1 or tightness < 3) throw std::runtime_error("[phot_beta_cut] tightness must be 1, 2, or 3.");
+  if (tightness != 1 and tightness != 2 and tightness != 3)
+    throw std::runtime_error("[phot_beta_cut] tightness must be 1, 2, or 3.");
 
   std::array<bounds, 3> beta_cut_LUT = {{
       {0.9, 2.0},   // loose
@@ -435,8 +505,7 @@ bool phot_beta_cut(clas12::region_particle* p, int tightness) {
 }
 
 bool phot_EC_sampling_fraction_cut(clas12::region_particle* p) {
-  double ECfrac_min = 0;
-  double ECfrac_max = 1;
+  bounds limits = {0, 1};
 
   double pcal = p->cal(clas12::PCAL)->getEnergy();
   double ecin = p->cal(clas12::ECIN)->getEnergy();
@@ -444,7 +513,7 @@ bool phot_EC_sampling_fraction_cut(clas12::region_particle* p) {
   double total = pcal + ecin + ecout;
 
   double cutvalue = total / p->par()->getP();
-  return (ECfrac_min < cutvalue && cutvalue < ECfrac_max);
+  return (limits.lower < cutvalue && cutvalue < limits.upper);
 }
 
 bool phot_EC_outer_vs_EC_inner_cut(clas12::region_particle* p) {
@@ -467,9 +536,9 @@ bool basic_FTOF_cut(clas12::region_particle* p) {
 bool FT_photid_FTCAL_fiducial_cut(clas12::region_particle* p) {
   double clusX = p->ft(clas12::FTCAL)->getX();
   double clusY = p->ft(clas12::FTCAL)->getY();
-  TVector3 V3ECalPos(clusX, clusY, 0);
+  ROOT::Math::XYZVector V3ECalPos(clusX, clusY, 0);
 
-  bool res = true && V3ECalPos.Mag() > 8 && V3ECalPos.Mag() < 15 &&
+  bool res = true && V3ECalPos.R() > 8 && V3ECalPos.R() < 15 &&
              TMath::Power(clusX + 8.5, 2) + TMath::Power(clusY - 10, 2) > 1.5 * 1.5 &&
              TMath::Power(clusX + 10, 2) + TMath::Power(clusY + 5, 2) > 1.5 * 1.5 &&
              TMath::Power(clusX + 6, 2) + TMath::Power(clusY + 13.5, 2) > 2 * 2 &&
