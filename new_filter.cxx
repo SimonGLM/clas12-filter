@@ -147,21 +147,21 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
     vars.SetValue("eventnumber", c12->runconfig()->getEvent());
     vars.SetValue("helicity", c12->event()->getHelicity());
     vars.SetValue("beam_charge", c12->event()->getBeamCharge());
-    
+
     // Clear Vector Fields
     vars.ResetVectorFields();  // clear and reserve all vector fields
 
     // ====================== EVENT CUTS ======================
     // do cuts on event level here if needed
     // something like EventBuilderFilter for example
-    
+
     // maybe Iguana?
     // Filter here
     // ig.GetFilters().doAllFilters();
 
     // Correct here
     // ig.GetTransformers().doAllCorrections();
-    
+
     auto particles = c12->getDetParticles();  // All detected particles in the event
     for (auto&& p : particles)                // 3.4s in loop
     {
