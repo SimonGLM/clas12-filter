@@ -17,6 +17,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <numeric>
 #include <string>
 
 // ROOT
@@ -54,6 +55,8 @@ using FourVector = ROOT::Math::PxPyPzMVector;
 void new_filter() { std::cout << "Called without arguments." << std::endl; }
 
 void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint numEvents = 0) {
+  bool verbose = false;
+
   ROOT::EnableImplicitMT();
   auto c12 = std::make_unique<clas12::clas12reader>(inFile);
   c12->setVerbose();
@@ -66,7 +69,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   // CCDB + RCDB + QADB
   //////////////////////////////////////////////////////////////////////////////
   clas12::clas12databases db;
-  c12->connectDataBases(&db); 
+  c12->connectDataBases(&db);
   char* CCDB_CONNECTION = getenv("CCDB_CONNECTION");
   char* RCDB_CONNECTION = getenv("RCDB_CONNECTION");
   if (CCDB_CONNECTION == NULL) {
@@ -120,7 +123,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
 
   // Create Writer that takes ownership of the model
   std::string tempfile = "/tmp/rntuple.root";
-  std::cout << "[RNTuple] Creating RNTuple writer from model..." << std::endl;
+  if (verbose) std::cout << "[RNTuple] Creating RNTuple writer from model..." << std::endl;
   auto file = ROOT::RNTupleWriter::Recreate(std::move(vars.Model()), "nTupleName", tempfile);
 
   // Event loop
@@ -131,13 +134,14 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   auto last_update = t0;
 
   // General conditions
-  std::cout << "[C12] Retrieving general run conditions..." << std::endl;
+  if (verbose) std::cout << "[C12] Retrieving general run conditions..." << std::endl;
 
   // THESE SEGFAULT !!!!
   // bool inbending = c12->runconfig()->getTorus() > 0 ? true : false;  // or from RCDB?
   // int runnum = c12->runconfig()->getRun();
   // !!!!!!!!!!!!!!!!!!!
   bool inbending = false;  // temporary
+  int tightness = 1;
 
   std::cout << std::format("Starting event loop for {} events...", events) << std::endl;
 
@@ -150,6 +154,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
 
     // Clear Vector Fields
     vars.ResetVectorFields();  // clear and reserve all vector fields
+    double reference_vertex = std::numeric_limits<double>::quiet_NaN();
 
     // ====================== EVENT CUTS ======================
     // do cuts on event level here if needed
@@ -162,73 +167,143 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
     // Correct here
     // ig.GetTransformers().doAllCorrections();
 
-    auto particles = c12->getDetParticles();  // All detected particles in the event
-    for (auto&& p : particles)                // 3.4s in loop
-    {
-      std::string name = pdg_name(p->getPid());
-      if (name == "unknown") {
-        // std::cout << "Unknown particle with PDG code " << p->getPid() << " found, skipping..." << std::endl;
+    // Store particles in map to process in required order later
+    if (verbose) std::cout << "Indexing particles..." << std::flush;
+    std::unordered_map<int, std::vector<clas12::region_part_ptr>> particlesByPDG = {
+        {11, {}}, {2212, {}}, {2112, {}}, {211, {}}, {-211, {}}, {321, {}}, {-321, {}}};
+    for (auto& p : c12->getDetParticles()) {
+      particlesByPDG[p->getPid()].push_back(p);
+    }
+    if (verbose) std::cout << " done." << std::endl;
+
+    if (particlesByPDG.at(11).size() <= 1) {
+      if (verbose) std::cout << "No electrons in event. Skipping event..." << std::endl;
+      continue;
+    }
+
+    // process all e- first, then nucleons, then mesons
+    for (int pdg : {11, 2212, 2112, 211, -211, 321, -321}) {
+      if (particlesByPDG[pdg].size() > 1) {
+        if (verbose) std::cout << "No " << pdg_name(pdg) << " in event. Skipping particle..." << std::endl;
         continue;
       }
-      
-      // ====================== PARTICLE CUTS ======================
-      // if (electron)
-      //   if (!electron_tests)
-      //     continue;
-      // if (proton)
-      //   if (!proton_tests)
-      //     continue;
-      // etc.
 
-      // ===========================================================
-      //                        Collect data
-      // ===========================================================
-      TParticlePDG* pdg = pdg_db->GetParticle(p->getPid());
-      if (pdg == nullptr) continue;
+      // sort particles by momentum for each PDG code
+      if (verbose)
+        std::cout << "Sorting particles: " << pdg_name(pdg) << " " << particlesByPDG[pdg].size() << std::endl;
+      std::sort(std::begin(particlesByPDG[pdg]), std::end(particlesByPDG[pdg]),
+                [](clas12::region_part_ptr a, clas12::region_part_ptr b) { return a->getP() > b->getP(); });
 
-      // ====================== MOMENTUM FIELDS ======================
-      // now we know particle_enum is a known particle, we can get away without std::optionals
-      if (vars.fParticlesOfInterestForMomentumFields.contains(p->getPid())) {
-        vars.AppendValue("p4_" + name + "_px", static_cast<double>(p->par()->getPx()));
-        vars.AppendValue("p4_" + name + "_py", static_cast<double>(p->par()->getPy()));
-        vars.AppendValue("p4_" + name + "_pz", static_cast<double>(p->par()->getPz()));
-        vars.AppendValue("p4_" + name + "_E",
-                         static_cast<double>(std::sqrt(std::pow(p->par()->getPx(), 2) + std::pow(p->par()->getPy(), 2) +
-                                                       std::pow(p->par()->getPz(), 2) + std::pow(pdg->Mass(), 2))));
-      }
-      // ====================== DETECTOR FIELDS ======================
-      if (vars.fParticlesOfInterestForDetectorFields.contains(p->getPid())) {
-        // Old way used  1000<=abs(part_status)<2000 => FT: ele_det=1
-        //               2000<=abs(part_Status)<4000 => FD: ele_det=2
-        //               4000<=abs(part_Status)      => CD: ele_det=3
-        // no idea if this is correct
-        int status = std::abs(p->getStatus());
-        int val = status >= 1000 && status < 2000 ? 1 : status >= 2000 && status < 4000 ? 2 : status >= 4000 ? 3 : -1;
-        vars.AppendValue(name + "_det", val);
+      if (pdg != 11 && std::isnan(reference_vertex)) {
+        // set reference_vertex to highest momentum electron
+        // this is only done once, after all electrons have been processed
+        if (verbose) std::cout << "Reference Vertex: " << std::flush;
+        reference_vertex = particlesByPDG.at(11).at(0)->par()->getVz();
+        if (verbose) std::cout << reference_vertex << std::endl;
       }
 
-      // ====================== SECTOR FIELDS ======================
-      if (vars.fParticlesOfInterestForSectorFields.contains(p->getPid())) {
-        vars.AppendValue(name + "_sec", static_cast<int>(p->getSector()));
-      }
+      // loop particles of this type
+      if (verbose)
+        std::cout << "Processing " << particlesByPDG[pdg].size() << " " << pdg_name(pdg) << "..." << std::endl;
 
-      // ====================== CHI2PID FIELDS ======================
-      if (vars.fParticlesOfInterestForChi2PidFields.contains(p->getPid())) {
-        vars.AppendValue("p4_" + name + "_chi2pid", static_cast<double>(p->getChi2Pid()));
-      }
+      for (auto&& p : particlesByPDG[pdg]) {
+        std::string name = pdg_name(p->getPid());
+        if (name == "unknown") {
+          // std::cout << "Unknown particle with PDG code " << p->getPid() << " found, skipping..." << std::endl;
+          continue;
+        }
 
-      // ====================== DC FIELDS ======================
-      if (vars.fParticlesOfInterestForDCFields.contains(p->getPid())) {
-        if (name == pdg_name(11)) {  // alternatively: if (p->getPid()==11)
-          vars.AppendValue("p4_" + name + "_dcedge1", static_cast<double>(p->traj(clas12::DC, 6)->getEdge()));
-          vars.AppendValue("p4_" + name + "_dcedge2", static_cast<double>(p->traj(clas12::DC, 18)->getEdge()));
-          vars.AppendValue("p4_" + name + "_dcedge3", static_cast<double>(p->traj(clas12::DC, 36)->getEdge()));
-        } else if (name == pdg_name(2122)) {
-          vars.AppendValue("p4_" + name + "_dcx1", static_cast<double>(p->traj(clas12::DC, 6)->getX()));
-          vars.AppendValue("p4_" + name + "_dcy1", static_cast<double>(p->traj(clas12::DC, 6)->getY()));
-          vars.AppendValue("p4_" + name + "_dcz1", static_cast<double>(p->traj(clas12::DC, 6)->getZ()));
+        // ====================== PARTICLE CUTS ======================
+        if (pdg == 11 && !selectors::electron(p, inbending, tightness)) {
+          particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
+                                    particlesByPDG[pdg].end());
+          continue;
+        }
+        if (pdg == 2212 && !selectors::proton(p, inbending, tightness, reference_vertex)) {
+          particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
+                                    particlesByPDG[pdg].end());
+          continue;
+        }
+        if (pdg == 2112 && !selectors::neutron(p, inbending, tightness, reference_vertex)) {
+          particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
+                                    particlesByPDG[pdg].end());
+          continue;
+        }
+        if (pdg == 211 && !selectors::piplus(p, inbending, tightness, reference_vertex)) {
+          particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
+                                    particlesByPDG[pdg].end());
+          continue;
+        }
+        if (pdg == -211 && !selectors::piminus(p, inbending, tightness, reference_vertex)) {
+          particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
+                                    particlesByPDG[pdg].end());
+          continue;
+        }
+        if (pdg == 321 && !selectors::Kplus(p, inbending, tightness, reference_vertex)) {
+          particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
+                                    particlesByPDG[pdg].end());
+          continue;
+        }
+        if (pdg == -321 && !selectors::Kminus(p, inbending, tightness, reference_vertex)) {
+          particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
+                                    particlesByPDG[pdg].end());
+          continue;
+        }
+
+        std::cout << std::format("Valid {} found!", name) << std::endl;
+
+        // ===========================================================
+        //                        Collect data
+        // ===========================================================
+        TParticlePDG* particle_pdg = pdg_db->GetParticle(p->getPid());
+        if (particle_pdg == nullptr) continue;
+
+        // ====================== MOMENTUM FIELDS ======================
+        // now we know particle_enum is a known particle, we can get away without std::optionals
+        if (vars.fParticlesOfInterestForMomentumFields.contains(p->getPid())) {
+          vars.AppendValue("p4_" + name + "_px", static_cast<double>(p->par()->getPx()));
+          vars.AppendValue("p4_" + name + "_py", static_cast<double>(p->par()->getPy()));
+          vars.AppendValue("p4_" + name + "_pz", static_cast<double>(p->par()->getPz()));
+          vars.AppendValue(
+              "p4_" + name + "_E",
+              static_cast<double>(std::sqrt(std::pow(p->par()->getPx(), 2) + std::pow(p->par()->getPy(), 2) +
+                                            std::pow(p->par()->getPz(), 2) + std::pow(particle_pdg->Mass(), 2))));
+        }
+        // ====================== DETECTOR FIELDS ======================
+        if (vars.fParticlesOfInterestForDetectorFields.contains(p->getPid())) {
+          // Old way used  1000<=abs(part_status)<2000 => FT: ele_det=1
+          //               2000<=abs(part_Status)<4000 => FD: ele_det=2
+          //               4000<=abs(part_Status)      => CD: ele_det=3
+          // no idea if this is correct
+          int status = std::abs(p->getStatus());
+          int val = status >= 1000 && status < 2000 ? 1 : status >= 2000 && status < 4000 ? 2 : status >= 4000 ? 3 : -1;
+          vars.AppendValue(name + "_det", val);
+        }
+
+        // ====================== SECTOR FIELDS ======================
+        if (vars.fParticlesOfInterestForSectorFields.contains(p->getPid())) {
+          vars.AppendValue(name + "_sec", static_cast<int>(p->getSector()));
+        }
+
+        // ====================== CHI2PID FIELDS ======================
+        if (vars.fParticlesOfInterestForChi2PidFields.contains(p->getPid())) {
+          vars.AppendValue("p4_" + name + "_chi2pid", static_cast<double>(p->getChi2Pid()));
+        }
+
+        // ====================== DC FIELDS ======================
+        if (vars.fParticlesOfInterestForDCFields.contains(p->getPid())) {
+          if (name == pdg_name(11)) {  // alternatively: if (p->getPid()==11)
+            vars.AppendValue("p4_" + name + "_dcedge1", static_cast<double>(p->traj(clas12::DC, 6)->getEdge()));
+            vars.AppendValue("p4_" + name + "_dcedge2", static_cast<double>(p->traj(clas12::DC, 18)->getEdge()));
+            vars.AppendValue("p4_" + name + "_dcedge3", static_cast<double>(p->traj(clas12::DC, 36)->getEdge()));
+          } else if (name == pdg_name(2122)) {
+            vars.AppendValue("p4_" + name + "_dcx1", static_cast<double>(p->traj(clas12::DC, 6)->getX()));
+            vars.AppendValue("p4_" + name + "_dcy1", static_cast<double>(p->traj(clas12::DC, 6)->getY()));
+            vars.AppendValue("p4_" + name + "_dcz1", static_cast<double>(p->traj(clas12::DC, 6)->getZ()));
+          }
         }
       }
+      if (verbose) std::cout << "Processing done." << std::endl;
     }
 
     // tell the RNTupleWriter that the values of the shared_ptrs in

@@ -34,7 +34,7 @@ class DynamicVarStore {
   std::set<int> fParticlesOfInterestForDCFields{};
 
  private:
-  bool DynamicVarStore::IsField(const std::string&);
+  bool IsField(const std::string&);
   bool verbose = false;
   // Each entry stores a shared_ptr<T> of one of the supported types
   using variant_type = std::variant<std::shared_ptr<int>, std::shared_ptr<float>, std::shared_ptr<double>,
@@ -47,7 +47,7 @@ class DynamicVarStore {
 };
 
 // Constructor that takes ownership of the model
-DynamicVarStore::DynamicVarStore(std::unique_ptr<ROOT::RNTupleModel> model, bool verbose = false)
+DynamicVarStore::DynamicVarStore(std::unique_ptr<ROOT::RNTupleModel> model, bool verbose)
     : fModel(std::move(model)), verbose(verbose) {
   if (this->verbose) std::cout << "[DynamicVarStore] Created with model." << std::endl;
 }
