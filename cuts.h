@@ -5,17 +5,24 @@
 #include <iostream>
 #include <map>
 #include <string>
-#include <unordered_set>
+#include <unordered_map>
 #include <vector>
 
 #include "region_particle.h"
 
 class StatisticsDecorator {
  private:
+  struct ChildStatistics {
+    int invocations = 0;
+    int rejections = 0;
+    int getAcceptance() const { return invocations - rejections; }
+    double getRejectionRate() const { return rejections * 1. / invocations; }
+  };
+
   std::string name;
   std::atomic<int> invocations{0};
   std::atomic<int> rejections{0};
-  std::unordered_set<StatisticsDecorator*> observed_children;
+  std::unordered_map<StatisticsDecorator*, ChildStatistics> child_stats;
 
   static std::map<std::string, StatisticsDecorator*>& registry() {
     static std::map<std::string, StatisticsDecorator*> reg;
@@ -40,8 +47,11 @@ class StatisticsDecorator {
  public:
   virtual ~StatisticsDecorator() { registry().erase(name); }
 
-  void on_child_called(StatisticsDecorator* child) {
-    observed_children.insert(child);
+  void on_child_called(StatisticsDecorator* child, bool result) {
+    child_stats[child].invocations++;
+    if (!result) {
+      child_stats[child].rejections++;
+    }
   }
 
   int getInvocations() const { return invocations; }
@@ -49,7 +59,7 @@ class StatisticsDecorator {
   int getAcceptance() const { return invocations - rejections; }
   double getRejectionRate() const { return rejections * 1. / invocations; }
   const std::string& get_name() const { return name; }
-  const std::unordered_set<StatisticsDecorator*>& getObservedChildren() const { return observed_children; }
+  const std::unordered_map<StatisticsDecorator*, ChildStatistics>& getChildStats() const { return child_stats; }
 
   // Static method to print all statistics
   static void printAllStatistics() {
@@ -93,14 +103,15 @@ class StatisticsDecorator {
                                  decorator->getRejectionRate() * 100)
                   << std::endl;
         
-        if (!decorator->observed_children.empty()) {
-          std::cout << "  Used cuts:" << std::endl;
-          for (auto* child : decorator->observed_children) {
-            std::cout << std::format("    {:<45} | Invocations: {:>10}  |  Accepted: {:>10}  |  Rejected: {:>10}",
+        if (!decorator->child_stats.empty()) {
+          std::cout << "  Used cuts (per-selector statistics):" << std::endl;
+          for (const auto& [child, stats] : decorator->child_stats) {
+            std::cout << std::format("    {:<45} | Invocations: {:>10}  |  Accepted: {:>10}  |  Rejected: {:>10}  |  Rej Rate: {:>6.2f}%",
                                      child->get_name(),
-                                     child->getInvocations(),
-                                     child->getAcceptance(),
-                                     child->getRejections())
+                                     stats.invocations,
+                                     stats.getAcceptance(),
+                                     stats.rejections,
+                                     stats.getRejectionRate() * 100)
                       << std::endl;
           }
         }
@@ -138,11 +149,6 @@ class DecoratedCut : public StatisticsDecorator {
 
   template <typename... Args>
   bool operator()(Args&&... args) {
-    // Notify parent if we're in a call context
-    if (!StatisticsDecorator::call_stack().empty()) {
-      StatisticsDecorator::call_stack().back()->on_child_called(this);
-    }
-    
     // Push ourselves onto the call stack
     StatisticsDecorator::call_stack().push_back(this);
     
@@ -152,8 +158,14 @@ class DecoratedCut : public StatisticsDecorator {
     // Pop ourselves from the call stack
     StatisticsDecorator::call_stack().pop_back();
     
-    // Track the result
+    // Track the result in our own statistics
     track_call(result);
+    
+    // Notify parent (if any) with our result
+    if (!StatisticsDecorator::call_stack().empty()) {
+      StatisticsDecorator::call_stack().back()->on_child_called(this, result);
+    }
+    
     return result;
   }
 };
