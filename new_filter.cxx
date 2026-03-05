@@ -42,6 +42,7 @@
 using region_part_ptr = clas12::region_particle*;  // needed for compilation
 
 // Own
+#include "cuts.cpp"
 #include "cuts.h"
 #include "dynamicvarstore.h"
 #include "helpers.h"
@@ -126,16 +127,8 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   if (verbose) std::cout << "[RNTuple] Creating RNTuple writer from model..." << std::endl;
   auto file = ROOT::RNTupleWriter::Recreate(std::move(vars.Model()), "nTupleName", tempfile);
 
-  // Event loop
-  //////////////////////////////////////////////////////////////////////////////
-  int count = 0;
-  uint progressInterval = 1;
-  auto t0 = steady_clock::now();
-  auto last_update = t0;
-
   // General conditions
   if (verbose) std::cout << "[C12] Retrieving general run conditions..." << std::endl;
-
   // THESE SEGFAULT !!!!
   // bool inbending = c12->runconfig()->getTorus() > 0 ? true : false;  // or from RCDB?
   // int runnum = c12->runconfig()->getRun();
@@ -143,10 +136,31 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   bool inbending = false;  // temporary
   int tightness = 1;
 
+  // Event loop
+  //////////////////////////////////////////////////////////////////////////////
+  int count = 0;
+  uint progressInterval = 1;
+  auto t0 = steady_clock::now();
+  uint last_count = 0;
+  auto last_update = t0;
   std::cout << std::format("Starting event loop for {} events...", events) << std::endl;
-
   while (c12->next() && ((events != -1 && count < events) || (events == -1)))  // 15.4s in Loop (c12.next() 8.8s)
   {
+    // progress updates
+    auto ti = steady_clock::now();
+    if (duration_cast<seconds>(ti - last_update).count() >= progressInterval) {
+      float time_remaining = duration_cast<milliseconds>(ti - t0).count() * (events * 1. / count - 1) / 1000.;
+      float percent = 100. * count / events;
+      std::string progress_bar(int(percent * 30) / 100, '=');
+      progress_bar.append(">");
+      progress_bar.resize(30, ' ');
+      fmt::print("{:>9d}/{:d} ({:>3.0f}%) [{:s}] {:.1f}s remaining ({:>6.0f} evts/s)\n", count, events, percent,
+                 progress_bar, time_remaining, (count - last_count) * 1. / progressInterval);
+      last_count = count;
+      last_update = steady_clock::now();
+    }
+    count++;
+
     // access variant stored in map with std::get<> and dereference the shared_ptr to set the that it holds.
     vars.SetValue("eventnumber", c12->runconfig()->getEvent());
     vars.SetValue("helicity", c12->event()->getHelicity());
@@ -167,45 +181,78 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
     // Correct here
     // ig.GetTransformers().doAllCorrections();
 
-    // Store particles in map to process in required order later
-    if (verbose) std::cout << "Indexing particles..." << std::flush;
+    // ==========================================================
+    //  1. Store particles in map to process in required order later
+    //     1.1 If no electrons, skip event
+    //  2. Loop over this map in particular particle order (e-, p, n, pi+, pi-, K+, K-)
+    //     2.1 Break loop if no valid electrons left
+    //     2.2 Sort particles of this type by momentum
+    //     2.3 If reference vertex not set, set it to highest momentum electron
+    //         This is only done once we are processing something other than electrons and since we have
+    //         processed e- first, we can just take the momentum of the first (accepted) electron
+    //  3. Loop over particles of this type and apply particle level cuts
+    //     3.1 If particle fails cuts, remove it from map and skip it
+    //     3.2 Otherwise, fill variables for this particle into RNTuple
+    //  4. Fill RNTuple after all particles have been processed
+    // ==========================================================
+
+    // =========================== 1. ===========================
+    if (verbose) std::cout << std::string(80, '=') << std::endl;
+    if (verbose)
+      std::cout << std::format("Event #{:<{}} has {} particles:", count, int(std::floor(std::log10(events))) + 1,
+                               c12->getDetParticles().size())
+                << std::endl;
     std::unordered_map<int, std::vector<clas12::region_part_ptr>> particlesByPDG = {
         {11, {}}, {2212, {}}, {2112, {}}, {211, {}}, {-211, {}}, {321, {}}, {-321, {}}};
     for (auto& p : c12->getDetParticles()) {
       particlesByPDG[p->getPid()].push_back(p);
     }
-    if (verbose) std::cout << " done." << std::endl;
+    if (verbose)
+      for (int pdg : {11, 2212, 2112, 211, -211, 321, -321})
+        std::cout << std::format("{:<8s}: {:>2d}", pdg_name(pdg), particlesByPDG[pdg].size()) << std::endl;
 
-    if (particlesByPDG.at(11).size() <= 1) {
+    // --------------------------- 1.1 ---------------------------
+    if (particlesByPDG.at(11).size() == 0) {
       if (verbose) std::cout << "No electrons in event. Skipping event..." << std::endl;
       continue;
     }
 
+    // =========================== 2. ===========================
     // process all e- first, then nucleons, then mesons
+    if (verbose) std::cout << "Processing particles..." << std::endl;
     for (int pdg : {11, 2212, 2112, 211, -211, 321, -321}) {
-      if (particlesByPDG[pdg].size() > 1) {
-        if (verbose) std::cout << "No " << pdg_name(pdg) << " in event. Skipping particle..." << std::endl;
+      // skip early if there are no particles of this pdg in the event
+      if (particlesByPDG[pdg].size() < 1) {
+        // if (verbose) std::cout << "No " << pdg_name(pdg) << " in event. Skipping particle..." << std::endl;
         continue;
       }
 
-      // sort particles by momentum for each PDG code
-      if (verbose)
-        std::cout << "Sorting particles: " << pdg_name(pdg) << " " << particlesByPDG[pdg].size() << std::endl;
-      std::sort(std::begin(particlesByPDG[pdg]), std::end(particlesByPDG[pdg]),
-                [](clas12::region_part_ptr a, clas12::region_part_ptr b) { return a->getP() > b->getP(); });
+      // --------------------------- 2.1 ---------------------------
+      if (pdg != 11 && particlesByPDG[11].size() == 0) {
+        if (verbose) std::cout << "No valid electrons in event. Rejecting event..." << std::endl;
+        break;
+      }
 
+      // --------------------------- 2.2 ---------------------------
+      // sort particles by momentum for each PDG code (if there are more than one particles to sort)
+      if (particlesByPDG[pdg].size() > 1) {
+        if (verbose)
+          std::cout << "Sorting particles: " << pdg_name(pdg) << " " << particlesByPDG[pdg].size() << std::endl;
+        std::sort(std::begin(particlesByPDG[pdg]), std::end(particlesByPDG[pdg]),
+                  [](clas12::region_part_ptr a, clas12::region_part_ptr b) { return a->getP() > b->getP(); });
+      }
+
+      // --------------------------- 2.3 ---------------------------
       if (pdg != 11 && std::isnan(reference_vertex)) {
         // set reference_vertex to highest momentum electron
         // this is only done once, after all electrons have been processed
         if (verbose) std::cout << "Reference Vertex: " << std::flush;
-        reference_vertex = particlesByPDG.at(11).at(0)->par()->getVz();
+        reference_vertex = particlesByPDG[11].at(0)->par()->getVz();
         if (verbose) std::cout << reference_vertex << std::endl;
       }
 
+      // ========================== 3. ==========================
       // loop particles of this type
-      if (verbose)
-        std::cout << "Processing " << particlesByPDG[pdg].size() << " " << pdg_name(pdg) << "..." << std::endl;
-
       for (auto&& p : particlesByPDG[pdg]) {
         std::string name = pdg_name(p->getPid());
         if (name == "unknown") {
@@ -213,8 +260,11 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
           continue;
         }
 
-        // ====================== PARTICLE CUTS ======================
+        // --------------------------- 3.1 ---------------------------
+        // // ====================== PARTICLE CUTS ======================
+        // check cuts with selector functions, if fail: remove from the event
         if (pdg == 11 && !selectors::electron(p, inbending, tightness)) {
+          if (verbose) std::cout << "Rejected electron" << std::endl;
           particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
                                     particlesByPDG[pdg].end());
           continue;
@@ -222,36 +272,43 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
         if (pdg == 2212 && !selectors::proton(p, inbending, tightness, reference_vertex)) {
           particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
                                     particlesByPDG[pdg].end());
+          if (verbose) std::cout << "Rejected proton" << std::endl;
           continue;
         }
         if (pdg == 2112 && !selectors::neutron(p, inbending, tightness, reference_vertex)) {
           particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
                                     particlesByPDG[pdg].end());
+          if (verbose) std::cout << "Rejected neutron" << std::endl;
           continue;
         }
         if (pdg == 211 && !selectors::piplus(p, inbending, tightness, reference_vertex)) {
           particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
                                     particlesByPDG[pdg].end());
+          if (verbose) std::cout << "Rejected piplus" << std::endl;
           continue;
         }
         if (pdg == -211 && !selectors::piminus(p, inbending, tightness, reference_vertex)) {
           particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
                                     particlesByPDG[pdg].end());
+          if (verbose) std::cout << "Rejected piminus" << std::endl;
           continue;
         }
         if (pdg == 321 && !selectors::Kplus(p, inbending, tightness, reference_vertex)) {
           particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
                                     particlesByPDG[pdg].end());
+          if (verbose) std::cout << "Rejected Kplus" << std::endl;
           continue;
         }
         if (pdg == -321 && !selectors::Kminus(p, inbending, tightness, reference_vertex)) {
           particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
                                     particlesByPDG[pdg].end());
+          if (verbose) std::cout << "Rejected Kminus" << std::endl;
           continue;
         }
 
-        std::cout << std::format("Valid {} found!", name) << std::endl;
+        if (verbose) std::cout << std::format("Valid {} found!", name) << std::endl;
 
+        // --------------------------- 3.2 ---------------------------
         // ===========================================================
         //                        Collect data
         // ===========================================================
@@ -303,29 +360,15 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
           }
         }
       }
-      if (verbose) std::cout << "Processing done." << std::endl;
     }
 
-    // tell the RNTupleWriter that the values of the shared_ptrs in
-    // the fields have changed
+    // =========================== 4. ===========================
     file->Fill();  // 2.7 s
-
-    // progress update
-    auto ti = steady_clock::now();
-    if (duration_cast<seconds>(ti - last_update).count() >= progressInterval) {
-      float time_remaining = duration_cast<milliseconds>(ti - t0).count() * (events * 1. / count - 1) / 1000.;
-      float percent = 100. * count / events;
-      std::string progress_bar(int(percent * 30) / 100, '=');
-      progress_bar.append(">");
-      progress_bar.resize(30, ' ');
-      fmt::print("{:>9d}/{:d} ({:>3.0f}%) [{:s}] {:.1f}s remaining\n", count, events, percent, progress_bar,
-                 time_remaining);
-      last_update = steady_clock::now();
-    }
-    count++;
   }
   fmt::print("Processed a total of {} events in {:.1f} seconds.\n", count,
              duration_cast<milliseconds>(steady_clock::now() - t0).count() / 1000.);
+
+  StatisticsDecorator::printAllStatistics();
 
   auto t1 = steady_clock::now();
   std::cout << "Writing to RNTuple to temporary file..." << std::flush;
