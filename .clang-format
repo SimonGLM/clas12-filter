@@ -1,2 +1,4 @@
 BasedOnStyle: Google
+IndentWidth: 2
+NamespaceIndentation: All
 ColumnLimit: 120
