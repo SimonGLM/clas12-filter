@@ -143,6 +143,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   auto t0 = steady_clock::now();
   uint last_count = 0;
   auto last_update = t0;
+  const std::vector<int> particle_sequence = {11, 2212, 2112, 211, -211, 321, -321, 22};
   std::cout << std::format("Starting event loop for {} events...", events) << std::endl;
   while (c12->next() && ((events != -1 && count < events) || (events == -1)))  // 15.4s in Loop (c12.next() 8.8s)
   {
@@ -202,13 +203,15 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
       std::cout << std::format("Event #{:<{}} has {} particles:", count, int(std::floor(std::log10(events))) + 1,
                                c12->getDetParticles().size())
                 << std::endl;
-    std::unordered_map<int, std::vector<clas12::region_part_ptr>> particlesByPDG = {
-        {11, {}}, {2212, {}}, {2112, {}}, {211, {}}, {-211, {}}, {321, {}}, {-321, {}}};
+    std::unordered_map<int, std::vector<clas12::region_part_ptr>> particlesByPDG;
+    for (int pdg : particle_sequence) {
+      particlesByPDG[pdg] = {};
+    }
     for (auto& p : c12->getDetParticles()) {
       particlesByPDG[p->getPid()].push_back(p);
     }
     if (verbose)
-      for (int pdg : {11, 2212, 2112, 211, -211, 321, -321})
+      for (int pdg : particle_sequence)
         std::cout << std::format("{:<8s}: {:>2d}", pdg_name(pdg), particlesByPDG[pdg].size()) << std::endl;
 
     // --------------------------- 1.1 ---------------------------
@@ -220,7 +223,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
     // =========================== 2. ===========================
     // process all e- first, then nucleons, then mesons
     if (verbose) std::cout << "Processing particles..." << std::endl;
-    for (int pdg : {11, 2212, 2112, 211, -211, 321, -321}) {
+    for (int pdg : particle_sequence) {
       // skip early if there are no particles of this pdg in the event
       if (particlesByPDG[pdg].size() < 1) {
         // if (verbose) std::cout << "No " << pdg_name(pdg) << " in event. Skipping particle..." << std::endl;
@@ -303,6 +306,12 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
           particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
                                     particlesByPDG[pdg].end());
           if (verbose) std::cout << "Rejected Kminus" << std::endl;
+          continue;
+        }
+        if (pdg == 22 && !selectors::photon(p, inbending, tightness, reference_vertex)) {
+          particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
+                                    particlesByPDG[pdg].end());
+          if (verbose) std::cout << "Rejected photon" << std::endl;
           continue;
         }
 

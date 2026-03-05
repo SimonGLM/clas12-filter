@@ -1,0 +1,4 @@
+## Iguana Filters
+clas12::EventBuilderFilter:
+  # list of PDG codes to filter for
+  pids: [ 11, -211 ]
