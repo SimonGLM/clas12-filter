@@ -5,6 +5,8 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <unordered_set>
+#include <vector>
 
 #include "region_particle.h"
 
@@ -13,6 +15,7 @@ class StatisticsDecorator {
   std::string name;
   std::atomic<int> invocations{0};
   std::atomic<int> rejections{0};
+  std::unordered_set<StatisticsDecorator*> observed_children;
 
   static std::map<std::string, StatisticsDecorator*>& registry() {
     static std::map<std::string, StatisticsDecorator*> reg;
@@ -29,14 +32,24 @@ class StatisticsDecorator {
     }
   }
 
+  static std::vector<StatisticsDecorator*>& call_stack() {
+    static std::vector<StatisticsDecorator*> stack;
+    return stack;
+  }
+
  public:
   virtual ~StatisticsDecorator() { registry().erase(name); }
+
+  void on_child_called(StatisticsDecorator* child) {
+    observed_children.insert(child);
+  }
 
   int getInvocations() const { return invocations; }
   int getRejections() const { return rejections; }
   int getAcceptance() const { return invocations - rejections; }
   double getRejectionRate() const { return rejections * 1. / invocations; }
   const std::string& get_name() const { return name; }
+  const std::unordered_set<StatisticsDecorator*>& getObservedChildren() const { return observed_children; }
 
   // Static method to print all statistics
   static void printAllStatistics() {
@@ -62,6 +75,57 @@ class StatisticsDecorator {
     }
     std::cout << "\033[0m" << std::string(120, '=') << std::endl;
   }
+
+  // Static method to print hierarchical statistics
+  static void printHierarchicalStatistics() {
+    std::cout << "\n" << std::string(120, '=') << std::endl;
+    std::cout << "SELECTOR STATISTICS (with child cut usage)" << std::endl;
+    std::cout << std::string(120, '=') << std::endl;
+
+    // Print selectors and their observed children
+    for (const auto& [name, decorator] : registry()) {
+      if (name.find("selector::") == 0) {
+        std::cout << "\n" << name << ":" << std::endl;
+        std::cout << std::format("  Invocations: {:>10}  |  Accepted: {:>10}  |  Rejected: {:>10}  |  Rejection Rate: {:>6.2f}%",
+                                 decorator->getInvocations(),
+                                 decorator->getAcceptance(),
+                                 decorator->getRejections(),
+                                 decorator->getRejectionRate() * 100)
+                  << std::endl;
+        
+        if (!decorator->observed_children.empty()) {
+          std::cout << "  Used cuts:" << std::endl;
+          for (auto* child : decorator->observed_children) {
+            std::cout << std::format("    {:<45} | Invocations: {:>10}  |  Accepted: {:>10}  |  Rejected: {:>10}",
+                                     child->get_name(),
+                                     child->getInvocations(),
+                                     child->getAcceptance(),
+                                     child->getRejections())
+                      << std::endl;
+          }
+        }
+      }
+    }
+
+    // Print flat list of all cuts
+    std::cout << "\n" << std::string(120, '=') << std::endl;
+    std::cout << "ALL CUTS STATISTICS SUMMARY" << std::endl;
+    std::cout << std::format("{:<47} | {:>15} | {:>15} | {:>15} | {:>15} ", "Cut Name", "Invocations", "Accepted",
+                             "Rejections", "Rejection Rate")
+              << std::endl;
+    std::cout << std::string(120, '=') << std::endl;
+    bool odd_row = false;
+    for (const auto& [name, decorator] : registry()) {
+      if (odd_row) std::cout << "\033[0;30m";
+      std::cout << std::format("{:<47} | {:>15} | {:>15} | {:>15} | {:>13.2f}%", name, decorator->getInvocations(),
+                               decorator->getAcceptance(), decorator->getRejections(),
+                               decorator->getRejectionRate() * 100)
+                << std::endl;
+      if (odd_row) std::cout << "\033[0m";
+      odd_row = !odd_row;
+    }
+    std::cout << "\033[0m" << std::string(120, '=') << std::endl;
+  }
 };
 
 template <typename Func>
@@ -74,7 +138,21 @@ class DecoratedCut : public StatisticsDecorator {
 
   template <typename... Args>
   bool operator()(Args&&... args) {
+    // Notify parent if we're in a call context
+    if (!StatisticsDecorator::call_stack().empty()) {
+      StatisticsDecorator::call_stack().back()->on_child_called(this);
+    }
+    
+    // Push ourselves onto the call stack
+    StatisticsDecorator::call_stack().push_back(this);
+    
+    // Execute the wrapped function
     bool result = func(std::forward<Args>(args)...);
+    
+    // Pop ourselves from the call stack
+    StatisticsDecorator::call_stack().pop_back();
+    
+    // Track the result
     track_call(result);
     return result;
   }
