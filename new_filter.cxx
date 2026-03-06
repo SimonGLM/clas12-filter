@@ -58,7 +58,7 @@ void new_filter() { std::cout << "Called without arguments." << std::endl; }
 void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint numEvents = 0) {
   bool verbose = false;
 
-  ROOT::EnableImplicitMT();
+  ROOT::DisableImplicitMT();
   auto c12 = std::make_unique<clas12::clas12reader>(inFile);
   c12->setVerbose();
   int events = numEvents != 0 ? numEvents : c12->getReader().getEntries();
