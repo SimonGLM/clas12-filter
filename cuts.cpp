@@ -15,7 +15,7 @@ struct bounds {
 };
 
 namespace cuts {
-  namespace generic {
+  namespace generic::impl {
     bool _forward_detector_cut(clas12::region_particle* p) {
       int det = abs(p->par()->getStatus());
       // clas12::FD<= det && det < clas12::CD;  // enum missmatch?
@@ -84,9 +84,9 @@ namespace cuts {
 
     //   return vz_bounds.lower < vz && vz < vz_bounds.upper;
     // }
-  }  // namespace generic
+  }  // namespace generic::impl
 
-  namespace FD {
+  namespace FD::impl {
     bool _HTCC_nphe_cut(clas12::region_particle* p) {
       // original CC_nphe_cut
       double nphe_min = 2;
@@ -387,8 +387,9 @@ namespace cuts {
           {211, {{2.5, 2.5, 9.0}, {3.5, 2.5, 6.5}}},  {-211, {{3.5, 3.0, 7.0}, {2.5, 2.5, 10.0}}},
           {321, {{2.5, 2.0, 9.0}, {3.5, 2.5, 6.5}}},  {-321, {{3.5, 2.5, 5.0}, {2.5, 2.5, 10.0}}}};
 
-      if (!cuts::generic::_PID_cut(p, 11) && !cuts::generic::_PID_cut(p, 2212) && !cuts::generic::_PID_cut(p, 211) &&
-          !cuts::generic::_PID_cut(p, -211) && !cuts::generic::_PID_cut(p, 321) && !cuts::generic::_PID_cut(p, -321)) {
+      if (!cuts::generic::impl::_PID_cut(p, 11) && !cuts::generic::impl::_PID_cut(p, 2212) &&
+          !cuts::generic::impl::_PID_cut(p, 211) && !cuts::generic::impl::_PID_cut(p, -211) &&
+          !cuts::generic::impl::_PID_cut(p, 321) && !cuts::generic::impl::_PID_cut(p, -321)) {
         throw std::domain_error(
             std::format("[DC_fiducial_cut_edge] Attempting cut on invalid PID '{}' for this cut.", p->getPid()));
       }
@@ -479,9 +480,10 @@ namespace cuts {
       double edep_min = 0.01;
       return (p->cal(clas12::ECIN)->getEnergy() + p->cal(clas12::ECOUT)->getEnergy()) > edep_min;
     }
-  }  // namespace FD
+  }  // namespace FD::impl
 
-  namespace FT {
+  namespace FT::impl {
+
     bool _FT_eid_FTCAL_fiducial_cut(clas12::region_particle* p) {
       double theta = std::acos(p->par()->getPz() / p->par()->getP()) * 180 / std::numbers::pi;
 
@@ -517,11 +519,13 @@ namespace cuts {
 
     bool _FT_photid_beta_cut([[maybe_unused]] clas12::region_particle* _) { return true; }
 
-  }  // namespace FT
+  }  // namespace FT::impl
 
-  namespace CD {}  // namespace CD
+  namespace CD::impl {
+    bool _CD_neutr_beta_cut(clas12::region_particle* p, int run) { return cuts::impl::_neutr_beta_cut(p, run); }
+  }  // namespace CD::impl
 
-  namespace vertex {
+  namespace vertex::impl {
 
     // We need a good reference vertex z for the *_delta_vz_cuts.
     // The old way is searching for the highest momentum electron in the event
@@ -569,34 +573,33 @@ namespace cuts {
       // bounds tolerances{-20, 20};
       // return tolerances.lower < reference_vertex_z && reference_vertex_z < tolerances.upper;
     }
-  }  // namespace vertex
+  }  // namespace vertex::impl
 
-  bool _phot_beta_cut(clas12::region_particle* p, int tightness) {
-    if (tightness != 1 and tightness != 2 and tightness != 3)
-      throw std::runtime_error("[phot_beta_cut] tightness must be 1, 2, or 3.");
+  namespace impl {
+    bool _phot_beta_cut(clas12::region_particle* p, int tightness) {
+      if (tightness != 1 and tightness != 2 and tightness != 3)
+        throw std::runtime_error("[phot_beta_cut] tightness must be 1, 2, or 3.");
 
-    std::array<bounds, 3> beta_cut_LUT = {{
-        {0.9, 2.0},   // loose
-        {0.9, 1.1},   // medium
-        {0.95, 1.05}  // tight
-    }};
+      std::array<bounds, 3> beta_cut_LUT = {{
+          {0.9, 2.0},   // loose
+          {0.9, 1.1},   // medium
+          {0.95, 1.05}  // tight
+      }};
 
-    float beta = p->par()->getBeta();
-    return beta_cut_LUT[tightness - 1].lower < beta && beta < beta_cut_LUT[tightness - 1].upper &&
-           p->par()->getP() > 0.10;
-  }
+      float beta = p->par()->getBeta();
+      return beta_cut_LUT[tightness - 1].lower < beta && beta < beta_cut_LUT[tightness - 1].upper &&
+             p->par()->getP() > 0.10;
+    }
 
-  bool _neutr_beta_cut(clas12::region_particle* p, int run) {
-    // very similar to phot_beta_cut
-    bounds limits = {0., 0.95};
-    return limits.lower < p->par()->getBeta() && p->par()->getBeta() < limits.upper;
-  }
+    bool _neutr_beta_cut(clas12::region_particle* p, int run) {
+      // very similar to phot_beta_cut
+      bounds limits = {0., 0.95};
+      return limits.lower < p->par()->getBeta() && p->par()->getBeta() < limits.upper;
+    }
 
-  bool _CD_neutr_beta_cut(clas12::region_particle* p, int run) { return _neutr_beta_cut(p, run); }
-
-  bool _basic_FTOF_cut(clas12::region_particle* p) {
-    return p->sci(clas12::FTOF1A)->getSector() != 0 || p->sci(clas12::FTOF1B)->getSector() != 0 ||
-           p->sci(clas12::FTOF2)->getSector() != 0;  // equal to "is somewhere in FTOF?", I guess...
-  }
-
+    bool _basic_FTOF_cut(clas12::region_particle* p) {
+      return p->sci(clas12::FTOF1A)->getSector() != 0 || p->sci(clas12::FTOF1B)->getSector() != 0 ||
+             p->sci(clas12::FTOF2)->getSector() != 0;  // equal to "is somewhere in FTOF?", I guess...
+    }
+  }  // namespace impl
 }  // namespace cuts
