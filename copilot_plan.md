@@ -5,14 +5,16 @@
 ## Problem Statement
 
 Current decorator-based system has:
+
 - Hidden global state (`call_stack()`) that's hard to understand
 - No per-particle tracking (can't see which cuts each particle failed)
 - No mode switching (can't choose early-return vs complete-evaluation)
-- Preprocessor hack considered for mode switching (`#define return`)
+- Preprocessor hack considered for mode switching (`#define custom_return`)
 
 ## Solution: Explicit Context Object
 
 Replace decorators with `ParticleContext` that:
+
 1. Tracks all cut results for each particle
 2. Supports two evaluation modes (early-return vs complete-trace)
 3. Makes data flow explicit (passed as parameter)
@@ -37,7 +39,9 @@ Cut Functions (unchanged logic)
 ## Implementation Steps
 
 ### 1. Create `particle_context.h`
+
 **New file** with:
+
 - `enum class EvaluationMode { EarlyReturn, CompleteTrace }`
 - `class ParticleContext` with:
   - `apply_cut(name, lambda)` or `check(name, func, args...)`
@@ -46,6 +50,7 @@ Cut Functions (unchanged logic)
   - `get_failed_cuts()` for programmatic access
 
 **Key behavior:**
+
 ```cpp
 bool apply_cut(const char* name, auto&& cut_func) {
   bool result = cut_func();
@@ -60,33 +65,41 @@ bool apply_cut(const char* name, auto&& cut_func) {
 ```
 
 ### 2. Simplify `cuts.h`
+
 **Delete:**
+
 - `StatisticsDecorator` class (entire ~130 lines)
 - `DecoratedCut` template class
 - `child_stats` tracking mechanism
 - `call_stack()` static function
 
 **Keep:**
+
 - Namespace structure (`cuts::generic::`, `cuts::FD::`, etc.)
 - Function declarations pointing to implementations
 - Clean, simple function pointers
 
 ### 3. Keep `cuts.cpp` unchanged
+
 - All cut implementations stay exactly as they are
 - Functions remain pure: `bool _some_cut(particle*, args...)`
 - No logic changes → no risk
 
 ### 4. Create `statistics_collector.h`
+
 **New file** with:
+
 - Singleton or static class for aggregate statistics
 - `record_cut(name, result)` → increment counters
 - `print_summary()` → current hierarchical output format
 - Optional: `ParticleContext` auto-reports if enabled
 
 ### 5. Refactor `particle_selector.h`
+
 **For each selector (`_electron`, `_proton`, etc.):**
 
 **Current pattern:**
+
 ```cpp
 bool _electron(clas12::region_particle* p, bool inbending, int tightness) {
   if (!cuts::generic::PID_cut(p, 11)) return false;
@@ -97,6 +110,7 @@ bool _electron(clas12::region_particle* p, bool inbending, int tightness) {
 ```
 
 **New pattern with helper macro:**
+
 ```cpp
 #define CHECK_CUT(ctx, name, ...) \
   if (!ctx.check(name, __VA_ARGS__)) return ctx.passed()
@@ -111,12 +125,15 @@ bool _electron(ParticleContext& ctx, clas12::region_particle* p,
 ```
 
 **Why this works:**
+
 - EarlyReturn mode: `ctx.passed()` returns `false` immediately → early exit
 - CompleteTrace mode: `ctx.passed()` returns `true` → continues to next cut
 - Final `return ctx.passed()` gives correct overall result
 
 ### 6. Update call sites (`filter_clas12_hipo.cxx` or similar)
+
 **Before:**
+
 ```cpp
 if (selectors::impl::electron(p, inbending, tightness)) {
   // accepted
@@ -124,6 +141,7 @@ if (selectors::impl::electron(p, inbending, tightness)) {
 ```
 
 **After:**
+
 ```cpp
 ParticleContext ctx(particle, EvaluationMode::EarlyReturn);
 if (selectors::impl::electron(ctx, p, inbending, tightness)) {
@@ -137,12 +155,15 @@ StatisticsCollector::print_summary();
 ```
 
 ### 7. Fix include structure
+
 **In `new_filter.cxx` (or similar):**
+
 - Remove `#include "cuts.cpp"` (line 45)
 - Add proper compilation: compile `cuts.cpp` separately and link
 - Keep normal `#include "cuts.h"`
 
 ### 8. Cleanup
+
 - Delete commented code blocks in `cuts.h` (lines 65-88, 103-123)
 - Remove unused `bool passed = true;` variables in selectors
 - Add brief comments explaining context usage
@@ -150,12 +171,14 @@ StatisticsCollector::print_summary();
 ## Configuration Options
 
 **Runtime mode switch:**
+
 ```cpp
 auto mode = config.debug_trace ? EvaluationMode::CompleteTrace 
                                 : EvaluationMode::EarlyReturn;
 ```
 
 **Compile-time mode (zero overhead):**
+
 ```cpp
 #ifdef DEBUG_TRACE_CUTS
   constexpr auto mode = EvaluationMode::CompleteTrace;
@@ -175,12 +198,14 @@ auto mode = config.debug_trace ? EvaluationMode::CompleteTrace
 ## Benefits
 
 ### Maintainability (Primary Goal)
+
 - **Explicit data flow:** Context passed visibly, no hidden globals
 - **Self-documenting:** `CHECK_CUT(ctx, "cut_name", ...)` is clear
 - **Easier to explain:** "Pass context, it tracks results" vs decorator magic
 - **Testable:** Mock context for unit tests
 
 ### Per-Particle Debugging (Requested Feature)
+
 ```
 Particle #1234 rejected:
   ✓ PID_cut(11)
@@ -192,12 +217,14 @@ Particle #1234 rejected:
 ```
 
 ### Mode Switching (Clean Solution)
+
 - No preprocessor hacks redefining `return`
 - Type-safe, debuggable control flow
 - Can vary per-particle if needed
 - IDE-friendly code
 
 ### Preserved Features
+
 - Global statistics (moved to StatisticsCollector)
 - Hierarchical output format (selector → cuts)
 - All cut logic unchanged
@@ -223,6 +250,7 @@ Particle #1234 rejected:
 ## Future Extensions
 
 Once implemented, easy to add:
+
 - Cut timing/profiling per particle
 - Conditional cuts (skip if another failed)
 - Cut result caching within event
