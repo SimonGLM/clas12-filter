@@ -49,6 +49,9 @@ using region_part_ptr = clas12::region_particle*;  // needed for compilation
 #include "helpers.h"
 #include "particle_selector.h"
 
+// Include cuts implementation for ACLiC
+#include "cuts.cpp"
+
 using namespace std::chrono;
 using FourVector = ROOT::Math::PxPyPzMVector;
 
@@ -378,7 +381,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   fmt::print("Processed a total of {} events in {:.1f} seconds.\n", count,
              duration_cast<milliseconds>(steady_clock::now() - t0).count() / 1000.);
 
-  StatisticsDecorator::printHierarchicalStatistics();
+  StatisticsCollector::print_hierarchical_statistics();
 
   auto t1 = steady_clock::now();
   std::cout << "Writing to RNTuple to temporary file..." << std::flush;

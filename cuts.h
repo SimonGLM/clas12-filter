@@ -42,15 +42,22 @@ namespace cuts {
     }  // namespace impl
 
     inline bool (*HTCC_nphe_cut)(clas12::region_particle*) = cuts::FD::impl::_HTCC_nphe_cut;
-    inline bool (*EC_sampling_fraction_cut)(clas12::region_particle*, bool, bool, bool) = cuts::FD::impl::_EC_sampling_fraction_cut;
-    inline bool (*EC_hit_position_fiducial_cut_homogeneous)(clas12::region_particle*, int, bool) = cuts::FD::impl::_EC_hit_position_fiducial_cut_homogeneous;
+    inline bool (*EC_sampling_fraction_cut)(clas12::region_particle*, bool, bool,
+                                            bool) = cuts::FD::impl::_EC_sampling_fraction_cut;
+    inline bool (*EC_hit_position_fiducial_cut_homogeneous)(clas12::region_particle*, int, bool) =
+        cuts::FD::impl::_EC_hit_position_fiducial_cut_homogeneous;
     inline bool (*EC_outer_vs_EC_inner_cut)(clas12::region_particle*, int) = cuts::FD::impl::_EC_outer_vs_EC_inner_cut;
-    inline bool (*DC_fiducial_cut_edge_region1)(clas12::region_particle*, bool) = cuts::FD::impl::_DC_fiducial_cut_edge_reg1;
-    inline bool (*DC_fiducial_cut_edge_region2)(clas12::region_particle*, bool) = cuts::FD::impl::_DC_fiducial_cut_edge_reg2;
-    inline bool (*DC_fiducial_cut_edge_region3)(clas12::region_particle*, bool) = cuts::FD::impl::_DC_fiducial_cut_edge_reg3;
+    inline bool (*DC_fiducial_cut_edge_region1)(clas12::region_particle*,
+                                                bool) = cuts::FD::impl::_DC_fiducial_cut_edge_reg1;
+    inline bool (*DC_fiducial_cut_edge_region2)(clas12::region_particle*,
+                                                bool) = cuts::FD::impl::_DC_fiducial_cut_edge_reg2;
+    inline bool (*DC_fiducial_cut_edge_region3)(clas12::region_particle*,
+                                                bool) = cuts::FD::impl::_DC_fiducial_cut_edge_reg3;
     inline bool (*DC_z_vertex_cut)(clas12::region_particle*) = cuts::FD::impl::_DC_z_vertex_cut;
-    inline bool (*phot_EC_sampling_fraction_cut)(clas12::region_particle*) = cuts::FD::impl::_phot_EC_sampling_fraction_cut;
-    inline bool (*phot_EC_outer_vs_EC_inner_cut)(clas12::region_particle*) = cuts::FD::impl::_phot_EC_outer_vs_EC_inner_cut;
+    inline bool (*phot_EC_sampling_fraction_cut)(clas12::region_particle*) =
+        cuts::FD::impl::_phot_EC_sampling_fraction_cut;
+    inline bool (*phot_EC_outer_vs_EC_inner_cut)(clas12::region_particle*) =
+        cuts::FD::impl::_phot_EC_outer_vs_EC_inner_cut;
   }  // namespace FD
 
   namespace FT {
@@ -66,7 +73,8 @@ namespace cuts {
     inline bool (*FT_eid_FTCAL_fiducial_cut)(clas12::region_particle*) = cuts::FT::impl::_FT_eid_FTCAL_fiducial_cut;
     inline bool (*FT_eid_FTTRK_fiducial_cut)(clas12::region_particle*) = cuts::FT::impl::_FT_eid_FTTRK_fiducial_cut;
     inline bool (*FT_eid_FTHODO_fiducial_cut)(clas12::region_particle*) = cuts::FT::impl::_FT_eid_FTHODO_fiducial_cut;
-    inline bool (*FT_photid_FTCAL_fiducial_cut)(clas12::region_particle*) = cuts::FT::impl::_FT_photid_FTCAL_fiducial_cut;
+    inline bool (*FT_photid_FTCAL_fiducial_cut)(clas12::region_particle*) =
+        cuts::FT::impl::_FT_photid_FTCAL_fiducial_cut;
     inline bool (*FT_eid_energy_vs_radius_cut)(clas12::region_particle*) = cuts::FT::impl::_FT_eid_energy_vs_radius_cut;
     inline bool (*FT_photid_beta_cut)(clas12::region_particle*) = cuts::FT::impl::_FT_photid_beta_cut;
   }  // namespace FT

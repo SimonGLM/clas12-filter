@@ -1,6 +1,6 @@
 #pragma once
-#include "particle_context.h"
 #include "cuts.h"
+#include "particle_context.h"
 
 // Helper macro to check cut and continue/stop based on mode
 #define CHECK_CUT(ctx, name, func, ...) \
@@ -15,8 +15,10 @@ namespace selectors {
       if (p->getRegion() == clas12::FD) {
         CHECK_CUT(ctx, "HTCC_nphe_cut", cuts::FD::impl::_HTCC_nphe_cut, p);
         CHECK_CUT(ctx, "EC_outer_vs_EC_inner_cut", cuts::FD::impl::_EC_outer_vs_EC_inner_cut, p, tightness);
-        CHECK_CUT(ctx, "EC_sampling_fraction_cut", cuts::FD::impl::_EC_sampling_fraction_cut, p, inbending, false, false);
-        CHECK_CUT(ctx, "EC_hit_position_fiducial_cut_homogeneous", cuts::FD::impl::_EC_hit_position_fiducial_cut_homogeneous, p, tightness, inbending);
+        CHECK_CUT(ctx, "EC_sampling_fraction_cut", cuts::FD::impl::_EC_sampling_fraction_cut, p, inbending, false,
+                  false);
+        CHECK_CUT(ctx, "EC_hit_position_fiducial_cut_homogeneous",
+                  cuts::FD::impl::_EC_hit_position_fiducial_cut_homogeneous, p, tightness, inbending);
         CHECK_CUT(ctx, "DC_fiducial_cut_edge_region1", cuts::FD::impl::_DC_fiducial_cut_edge_reg1, p, inbending);
         CHECK_CUT(ctx, "DC_fiducial_cut_edge_region2", cuts::FD::impl::_DC_fiducial_cut_edge_reg2, p, inbending);
         CHECK_CUT(ctx, "DC_fiducial_cut_edge_region3", cuts::FD::impl::_DC_fiducial_cut_edge_reg3, p, inbending);
@@ -31,7 +33,8 @@ namespace selectors {
       return ctx.passed();
     }
 
-    bool _proton(ParticleContext& ctx, clas12::region_particle* p, bool inbending, int tightness, double reference_vertex_z) {
+    bool _proton(ParticleContext& ctx, clas12::region_particle* p, bool inbending, int tightness,
+                 double reference_vertex_z) {
       CHECK_CUT(ctx, "PID_cut(2212)", cuts::generic::impl::_PID_cut, p, 2212);
       CHECK_CUT(ctx, "charge_cut(+1)", cuts::generic::impl::_charge_cut, p, +1);
 
@@ -44,7 +47,8 @@ namespace selectors {
       return ctx.passed();
     }
 
-    bool _neutron(ParticleContext& ctx, clas12::region_particle* p, bool inbending, int tightness, double reference_vertex_z) {
+    bool _neutron(ParticleContext& ctx, clas12::region_particle* p, bool inbending, int tightness,
+                  double reference_vertex_z) {
       CHECK_CUT(ctx, "PID_cut(2112)", cuts::generic::impl::_PID_cut, p, 2112);
       CHECK_CUT(ctx, "charge_cut(0)", cuts::generic::impl::_charge_cut, p, 0);
 
@@ -58,7 +62,8 @@ namespace selectors {
       return ctx.passed();
     }
 
-    bool _piplus(ParticleContext& ctx, clas12::region_particle* p, bool inbending, int tightness, double reference_vertex_z) {
+    bool _piplus(ParticleContext& ctx, clas12::region_particle* p, bool inbending, int tightness,
+                 double reference_vertex_z) {
       if (!ctx.apply_cut("PID_cut(221)", cuts::generic::impl::_PID_cut, p, 221)) return ctx.passed();
       CHECK_CUT(ctx, "charge_cut(+1)", cuts::generic::impl::_charge_cut, p, +1);
 
@@ -71,7 +76,8 @@ namespace selectors {
       return ctx.passed();
     }
 
-    bool _piminus(ParticleContext& ctx, clas12::region_particle* p, bool inbending, int tightness, double reference_vertex_z) {
+    bool _piminus(ParticleContext& ctx, clas12::region_particle* p, bool inbending, int tightness,
+                  double reference_vertex_z) {
       if (!ctx.apply_cut("PID_cut(221)", cuts::generic::impl::_PID_cut, p, 221)) return ctx.passed();
       CHECK_CUT(ctx, "charge_cut(-1)", cuts::generic::impl::_charge_cut, p, -1);
 
@@ -85,7 +91,8 @@ namespace selectors {
       return ctx.passed();
     }
 
-    bool _Kplus(ParticleContext& ctx, clas12::region_particle* p, bool inbending, int tightness, double reference_vertex_z) {
+    bool _Kplus(ParticleContext& ctx, clas12::region_particle* p, bool inbending, int tightness,
+                double reference_vertex_z) {
       CHECK_CUT(ctx, "PID_cut(321)", cuts::generic::impl::_PID_cut, p, 321);
       CHECK_CUT(ctx, "charge_cut(+1)", cuts::generic::impl::_charge_cut, p, +1);
       CHECK_CUT(ctx, "delta_vz_cut", cuts::vertex::impl::_delta_vz_cut, p, reference_vertex_z);
@@ -98,7 +105,8 @@ namespace selectors {
       return ctx.passed();
     }
 
-    bool _Kminus(ParticleContext& ctx, clas12::region_particle* p, bool inbending, int tightness, double reference_vertex_z) {
+    bool _Kminus(ParticleContext& ctx, clas12::region_particle* p, bool inbending, int tightness,
+                 double reference_vertex_z) {
       CHECK_CUT(ctx, "PID_cut(321)", cuts::generic::impl::_PID_cut, p, 321);
       CHECK_CUT(ctx, "charge_cut(-1)", cuts::generic::impl::_charge_cut, p, -1);
       CHECK_CUT(ctx, "delta_vz_cut", cuts::vertex::impl::_delta_vz_cut, p, reference_vertex_z);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fmt/format.h>
+
 #include <iostream>
 #include <map>
 #include <string>
@@ -51,7 +52,7 @@ class StatisticsCollector {
     for (const auto& [name, stats] : registry()) {
       if (odd_row) std::cout << "\033[0;30m";
       std::cout << fmt::format("{:<47} | {:>15} | {:>15} | {:>15} | {:>13.2f}%", name, stats.invocations,
-                              stats.getAcceptance(), stats.rejections, stats.getRejectionRate() * 100)
+                               stats.getAcceptance(), stats.rejections, stats.getRejectionRate() * 100)
                 << std::endl;
       if (odd_row) std::cout << "\033[0m";
       odd_row = !odd_row;
@@ -77,14 +78,13 @@ class StatisticsCollector {
         total_acceptances = total_invocations - total_rejections;
 
         std::cout << fmt::format("\033[1m{:<47} | {:>15} | {:>15} | {:>15} | {:>13.2f}%\033[0m", selector_name,
-                                total_invocations, total_acceptances, total_rejections,
-                                total_rejections * 1. / total_invocations * 100)
+                                 total_invocations, total_acceptances, total_rejections,
+                                 total_rejections * 1. / total_invocations * 100)
                   << std::endl;
 
         for (const auto& [cut_name, stats] : cuts) {
-          std::cout << fmt::format("    {:<43} | {:>15} | {:>15} | {:>15} | {:>13.2f}%", cut_name,
-                                  stats.invocations, stats.getAcceptance(), stats.rejections,
-                                  stats.getRejectionRate() * 100)
+          std::cout << fmt::format("    {:<43} | {:>15} | {:>15} | {:>15} | {:>13.2f}%", cut_name, stats.invocations,
+                                   stats.getAcceptance(), stats.rejections, stats.getRejectionRate() * 100)
                     << std::endl;
         }
       }
