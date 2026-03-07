@@ -193,21 +193,21 @@ namespace selectors {
       // std::cout << std::format("Valid photon.") << std::endl;
       return true;
     }
-    static DecoratedCut<bool (*)(clas12::region_particle*, bool, int)> electron("selector::electron",
-                                                                                selectors::impl::_electron);
-    static DecoratedCut<bool (*)(clas12::region_particle*, bool, int, double)> proton("selector::proton",
-                                                                                      selectors::impl::_proton);
-    static DecoratedCut<bool (*)(clas12::region_particle*, bool, int, double)> neutron("selector::neutron",
-                                                                                       selectors::impl::_neutron);
-    static DecoratedCut<bool (*)(clas12::region_particle*, bool, int, double)> piplus("selector::piplus",
-                                                                                      selectors::impl::_piplus);
-    static DecoratedCut<bool (*)(clas12::region_particle*, bool, int, double)> piminus("selector::piminus",
-                                                                                       selectors::impl::_piminus);
-    static DecoratedCut<bool (*)(clas12::region_particle*, bool, int, double)> Kplus("selector::Kplus",
-                                                                                     selectors::impl::_Kplus);
-    static DecoratedCut<bool (*)(clas12::region_particle*, bool, int, double)> Kminus("selector::Kminus",
-                                                                                      selectors::impl::_Kminus);
-    static DecoratedCut<bool (*)(clas12::region_particle*, bool, int, double)> photon("selector::photon",
-                                                                                      selectors::impl::_photon);
   }  // namespace impl
+  static DecoratedCut<bool (*)(clas12::region_particle*, bool, int)> electron("selector::electron",
+                                                                              selectors::impl::_electron);
+  static DecoratedCut<bool (*)(clas12::region_particle*, bool, int, double)> proton("selector::proton",
+                                                                                    selectors::impl::_proton);
+  static DecoratedCut<bool (*)(clas12::region_particle*, bool, int, double)> neutron("selector::neutron",
+                                                                                     selectors::impl::_neutron);
+  static DecoratedCut<bool (*)(clas12::region_particle*, bool, int, double)> piplus("selector::piplus",
+                                                                                    selectors::impl::_piplus);
+  static DecoratedCut<bool (*)(clas12::region_particle*, bool, int, double)> piminus("selector::piminus",
+                                                                                     selectors::impl::_piminus);
+  static DecoratedCut<bool (*)(clas12::region_particle*, bool, int, double)> Kplus("selector::Kplus",
+                                                                                   selectors::impl::_Kplus);
+  static DecoratedCut<bool (*)(clas12::region_particle*, bool, int, double)> Kminus("selector::Kminus",
+                                                                                    selectors::impl::_Kminus);
+  static DecoratedCut<bool (*)(clas12::region_particle*, bool, int, double)> photon("selector::photon",
+                                                                                    selectors::impl::_photon);
 }  // namespace selectors
