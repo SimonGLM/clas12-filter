@@ -42,8 +42,9 @@
 using region_part_ptr = clas12::region_particle*;  // needed for compilation
 
 // Own
-#include "cuts.cpp"
 #include "cuts.h"
+#include "particle_context.h"
+#include "statistics_collector.h"
 #include "dynamicvarstore.h"
 #include "helpers.h"
 #include "particle_selector.h"
