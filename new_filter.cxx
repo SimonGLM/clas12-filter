@@ -43,11 +43,11 @@ using region_part_ptr = clas12::region_particle*;  // needed for compilation
 
 // Own
 #include "cuts.h"
-#include "particle_context.h"
-#include "statistics_collector.h"
 #include "dynamicvarstore.h"
 #include "helpers.h"
+#include "particle_context.h"
 #include "particle_selector.h"
+#include "statistics_collector.h"
 
 // Include cuts implementation for ACLiC
 #include "cuts.cpp"
@@ -133,12 +133,18 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
 
   // General conditions
   if (verbose) std::cout << "[C12] Retrieving general run conditions..." << std::endl;
+
   // THESE SEGFAULT !!!!
   // bool inbending = c12->runconfig()->getTorus() > 0 ? true : false;  // or from RCDB?
   // int runnum = c12->runconfig()->getRun();
-  // !!!!!!!!!!!!!!!!!!!
   bool inbending = false;  // temporary
   int tightness = 1;
+  // !!!!!!!!!!!!!!!!!!!
+
+  // specify evaluation mode for selectors
+  // EarlyReturn: Immediatly return on rejected cut,
+  // CompleteTrace: check ALL cuts, then return
+  selectors::evaluation_mode = EvaluationMode::EarlyReturn;
 
   // Event loop
   //////////////////////////////////////////////////////////////////////////////
@@ -376,7 +382,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
     }
 
     // =========================== 4. ===========================
-    file->Fill();  // 2.7 s
+    file->Fill();
   }
   fmt::print("Processed a total of {} events in {:.1f} seconds.\n", count,
              duration_cast<milliseconds>(steady_clock::now() - t0).count() / 1000.);
@@ -405,7 +411,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   opts.fOutputFormat = ROOT::RDF::ESnapshotOutputFormat::kTTree;
   df.Snapshot("out_tree", outputfile, df.GetColumnNames(), opts);  // 6.5s
   std::remove(tempfile.c_str());                                   // Delete the temporary file
-  std::cout << std::format(" {:.1f}s", duration_cast<milliseconds>(steady_clock::now() - t3).count() / 1000.)
+  std::cout << std::format(" {:>2.1f}s", duration_cast<milliseconds>(steady_clock::now() - t3).count() / 1000.)
             << std::endl;
 
   std::cout << "done." << std::endl;

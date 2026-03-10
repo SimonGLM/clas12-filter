@@ -2,9 +2,11 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <iostream>
 #include <map>
 #include <string>
+#include <vector>
 
 class StatisticsCollector {
  private:
@@ -16,13 +18,19 @@ class StatisticsCollector {
     double getRejectionRate() const { return rejections * 1. / invocations; }
   };
 
+  struct SelectorStats {
+    int invocations = 0;
+    int rejections = 0;
+    std::unordered_map<std::string, CutStats> cuts;
+  };
+
   static std::map<std::string, CutStats>& registry() {
     static std::map<std::string, CutStats> reg;
     return reg;
   }
 
-  static std::map<std::string, std::map<std::string, CutStats>>& selector_registry() {
-    static std::map<std::string, std::map<std::string, CutStats>> reg;
+  static std::map<std::string, SelectorStats>& selector_registry() {
+    static std::map<std::string, SelectorStats> reg;
     return reg;
   }
 
@@ -36,55 +44,58 @@ class StatisticsCollector {
   }
 
   static void record_cut_in_selector(const std::string& selector_name, const std::string& cut_name, bool result) {
-    auto& stats = selector_registry()[selector_name][cut_name];
-    stats.invocations++;
+    auto& selector_stats = selector_registry()[selector_name];
+    auto& cut_stats = selector_stats.cuts[cut_name];
+    cut_stats.invocations++;
     if (!result) {
-      stats.rejections++;
+      cut_stats.rejections++;
     }
   }
 
-  static void print_summary() {
-    std::cout << "\n" << std::string(120, '=') << std::endl;
-    std::cout << "CUT STATISTICS SUMMARY" << std::endl;
-    std::cout << std::string(120, '=') << std::endl;
-
-    bool odd_row = false;
-    for (const auto& [name, stats] : registry()) {
-      if (odd_row) std::cout << "\033[0;30m";
-      std::cout << fmt::format("{:<47} | {:>15} | {:>15} | {:>15} | {:>13.2f}%", name, stats.invocations,
-                               stats.getAcceptance(), stats.rejections, stats.getRejectionRate() * 100)
-                << std::endl;
-      if (odd_row) std::cout << "\033[0m";
-      odd_row = !odd_row;
+  static void record_selector_invocation(const std::string& selector_name, bool passed) {
+    auto& selector_stats = selector_registry()[selector_name];
+    selector_stats.invocations++;
+    if (!passed) {
+      selector_stats.rejections++;
     }
-    std::cout << "\033[0m" << std::string(120, '=') << std::endl;
   }
 
   static void print_hierarchical_statistics() {
     std::cout << "\n" << std::string(120, '=') << std::endl;
-    std::cout << "SELECTOR STATISTICS (with child cut usage)" << std::endl;
+    std::cout << std::format("{:<47} | {:>15} | {:>15} | {:>15} | {:>15} ",
+                             "SELECTOR STATISTICS (with child cut usage)", "Invokations", "Accepted", "Rejected",
+                             "Rejection rate")
+              << std::endl;
     std::cout << std::string(120, '=') << std::endl;
 
-    for (const auto& [selector_name, cuts] : selector_registry()) {
-      if (!cuts.empty()) {
-        int total_invocations = 0;
-        int total_acceptances = 0;
-        int total_rejections = 0;
+    // Convert selector registry to a vector and sort by invocations
+    std::vector<std::pair<std::string, SelectorStats>> sorted_selectors(selector_registry().begin(),
+                                                                        selector_registry().end());
+    std::sort(sorted_selectors.begin(), sorted_selectors.end(),
+              [](const auto& a, const auto& b) { return a.second.invocations > b.second.invocations; });
 
-        for (const auto& [cut_name, stats] : cuts) {
-          total_invocations += stats.invocations;
-          total_rejections += stats.rejections;
-        }
-        total_acceptances = total_invocations - total_rejections;
+    for (const auto& [selector_name, selector_stats] : sorted_selectors) {
+      if (!selector_stats.cuts.empty()) {
+        // The selector's invocation count is tracked separately
+        int selector_invocations = selector_stats.invocations;
+        int selector_rejections = selector_stats.rejections;
+        int selector_acceptances = selector_invocations - selector_rejections;
 
-        std::cout << fmt::format("\033[1m{:<47} | {:>15} | {:>15} | {:>15} | {:>13.2f}%\033[0m", selector_name,
-                                 total_invocations, total_acceptances, total_rejections,
-                                 total_rejections * 1. / total_invocations * 100)
+        std::cout << std::format("\033[1m{:<47} | {:>15} | {:>15} | {:>15} | {:>13.2f}%\033[0m", selector_name,
+                                 selector_invocations, selector_acceptances, selector_rejections,
+                                 selector_invocations > 0 ? selector_rejections * 1. / selector_invocations * 100 : 0)
                   << std::endl;
 
-        for (const auto& [cut_name, stats] : cuts) {
-          std::cout << fmt::format("    {:<43} | {:>15} | {:>15} | {:>15} | {:>13.2f}%", cut_name, stats.invocations,
-                                   stats.getAcceptance(), stats.rejections, stats.getRejectionRate() * 100)
+        // Sort child cuts by invocations
+        std::vector<std::pair<std::string, CutStats>> sorted_cuts(selector_stats.cuts.begin(),
+                                                                  selector_stats.cuts.end());
+        std::sort(sorted_cuts.begin(), sorted_cuts.end(),
+                  [](const auto& a, const auto& b) { return a.second.invocations > b.second.invocations; });
+
+        for (const auto& [cut_name, stats] : sorted_cuts) {
+          std::cout << std::format("    {:<43} | {:>15} | {:>15} | {:>15} | {:>13.2f}%", cut_name, stats.invocations,
+                                   stats.getAcceptance(), stats.rejections,
+                                   stats.invocations > 0 ? stats.getRejectionRate() * 100 : 0)
                     << std::endl;
         }
       }

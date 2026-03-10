@@ -8,6 +8,7 @@
   if (!ctx.apply_cut(name, func, __VA_ARGS__)) return ctx.passed()
 
 namespace selectors {
+  EvaluationMode evaluation_mode = EvaluationMode::EarlyReturn;
   namespace impl {
     bool _electron(ParticleContext& ctx, clas12::region_particle* p, bool inbending, int tightness) {
       CHECK_CUT(ctx, "PID_cut(11)", cuts::generic::impl::_PID_cut, p, 11);
@@ -23,7 +24,7 @@ namespace selectors {
         CHECK_CUT(ctx, "DC_fiducial_cut_edge_region1", cuts::FD::impl::_DC_fiducial_cut_edge_reg1, p, inbending);
         CHECK_CUT(ctx, "DC_fiducial_cut_edge_region2", cuts::FD::impl::_DC_fiducial_cut_edge_reg2, p, inbending);
         CHECK_CUT(ctx, "DC_fiducial_cut_edge_region3", cuts::FD::impl::_DC_fiducial_cut_edge_reg3, p, inbending);
-        CHECK_CUT(ctx, "DC_z_vertex_cut", cuts::FD::impl::_DC_z_vertex_cut, p);
+        CHECK_CUT(ctx, "DC_z_vertex_cut", cuts::FD::impl::_DC_z_vertex_cut, p, inbending);
       }
       if (p->getRegion() == clas12::FT) {
         CHECK_CUT(ctx, "FT_eid_FTCAL_fiducial_cut", cuts::FT::impl::_FT_eid_FTCAL_fiducial_cut, p);
@@ -65,7 +66,7 @@ namespace selectors {
 
     bool _piplus(ParticleContext& ctx, clas12::region_particle* p, bool inbending, int tightness,
                  double reference_vertex_z) {
-      if (!ctx.apply_cut("PID_cut(221)", cuts::generic::impl::_PID_cut, p, 221)) return ctx.passed();
+      if (!ctx.apply_cut("PID_cut(211)", cuts::generic::impl::_PID_cut, p, 211)) return ctx.passed();
       CHECK_CUT(ctx, "charge_cut(+1)", cuts::generic::impl::_charge_cut, p, +1);
 
       if (p->getRegion() == clas12::FD) {
@@ -79,7 +80,7 @@ namespace selectors {
 
     bool _piminus(ParticleContext& ctx, clas12::region_particle* p, bool inbending, int tightness,
                   double reference_vertex_z) {
-      if (!ctx.apply_cut("PID_cut(221)", cuts::generic::impl::_PID_cut, p, 221)) return ctx.passed();
+      if (!ctx.apply_cut("PID_cut(-211)", cuts::generic::impl::_PID_cut, p, -211)) return ctx.passed();
       CHECK_CUT(ctx, "charge_cut(-1)", cuts::generic::impl::_charge_cut, p, -1);
 
       if (p->getRegion() == clas12::FD) {
@@ -108,7 +109,7 @@ namespace selectors {
 
     bool _Kminus(ParticleContext& ctx, clas12::region_particle* p, bool inbending, int tightness,
                  double reference_vertex_z) {
-      CHECK_CUT(ctx, "PID_cut(321)", cuts::generic::impl::_PID_cut, p, 321);
+      CHECK_CUT(ctx, "PID_cut(-321)", cuts::generic::impl::_PID_cut, p, -321);
       CHECK_CUT(ctx, "charge_cut(-1)", cuts::generic::impl::_charge_cut, p, -1);
       CHECK_CUT(ctx, "delta_vz_cut", cuts::vertex::impl::_delta_vz_cut, p, reference_vertex_z);
 
@@ -138,7 +139,8 @@ namespace selectors {
   }  // namespace impl
 
   // Helper function to record cut history to statistics
-  inline void record_selector_cuts(const std::string& selector_name, const ParticleContext& ctx) {
+  inline void record_selector_cuts(const std::string& selector_name, const ParticleContext& ctx, bool result) {
+    StatisticsCollector::record_selector_invocation(selector_name, !result);
     for (const auto& cut : ctx.get_cut_history()) {
       StatisticsCollector::record_cut_in_selector(selector_name, cut.name, cut.passed);
     }
@@ -147,58 +149,58 @@ namespace selectors {
   // Public interface functions that create ParticleContext internally
   // These match the calling interface in new_filter.cxx
   inline bool electron(clas12::region_particle* p, bool inbending, int tightness) {
-    ParticleContext ctx(EvaluationMode::EarlyReturn);
+    ParticleContext ctx(evaluation_mode);
     bool result = impl::_electron(ctx, p, inbending, tightness);
-    record_selector_cuts("electron", ctx);
+    record_selector_cuts("electron", ctx, result);
     return result;
   }
 
   inline bool proton(clas12::region_particle* p, bool inbending, int tightness, double reference_vertex_z) {
-    ParticleContext ctx(EvaluationMode::EarlyReturn);
+    ParticleContext ctx(evaluation_mode);
     bool result = impl::_proton(ctx, p, inbending, tightness, reference_vertex_z);
-    record_selector_cuts("proton", ctx);
+    record_selector_cuts("proton", ctx, result);
     return result;
   }
 
   inline bool neutron(clas12::region_particle* p, bool inbending, int tightness, double reference_vertex_z) {
-    ParticleContext ctx(EvaluationMode::EarlyReturn);
+    ParticleContext ctx(evaluation_mode);
     bool result = impl::_neutron(ctx, p, inbending, tightness, reference_vertex_z);
-    record_selector_cuts("neutron", ctx);
+    record_selector_cuts("neutron", ctx, result);
     return result;
   }
 
   inline bool piplus(clas12::region_particle* p, bool inbending, int tightness, double reference_vertex_z) {
-    ParticleContext ctx(EvaluationMode::EarlyReturn);
+    ParticleContext ctx(evaluation_mode);
     bool result = impl::_piplus(ctx, p, inbending, tightness, reference_vertex_z);
-    record_selector_cuts("piplus", ctx);
+    record_selector_cuts("piplus", ctx, result);
     return result;
   }
 
   inline bool piminus(clas12::region_particle* p, bool inbending, int tightness, double reference_vertex_z) {
-    ParticleContext ctx(EvaluationMode::EarlyReturn);
+    ParticleContext ctx(evaluation_mode);
     bool result = impl::_piminus(ctx, p, inbending, tightness, reference_vertex_z);
-    record_selector_cuts("piminus", ctx);
+    record_selector_cuts("piminus", ctx, result);
     return result;
   }
 
   inline bool Kplus(clas12::region_particle* p, bool inbending, int tightness, double reference_vertex_z) {
-    ParticleContext ctx(EvaluationMode::EarlyReturn);
+    ParticleContext ctx(evaluation_mode);
     bool result = impl::_Kplus(ctx, p, inbending, tightness, reference_vertex_z);
-    record_selector_cuts("Kplus", ctx);
+    record_selector_cuts("Kplus", ctx, result);
     return result;
   }
 
   inline bool Kminus(clas12::region_particle* p, bool inbending, int tightness, double reference_vertex_z) {
-    ParticleContext ctx(EvaluationMode::EarlyReturn);
+    ParticleContext ctx(evaluation_mode);
     bool result = impl::_Kminus(ctx, p, inbending, tightness, reference_vertex_z);
-    record_selector_cuts("Kminus", ctx);
+    record_selector_cuts("Kminus", ctx, result);
     return result;
   }
 
   inline bool photon(clas12::region_particle* p, bool inbending, int tightness, double reference_vertex_z) {
-    ParticleContext ctx(EvaluationMode::EarlyReturn);
+    ParticleContext ctx(evaluation_mode);
     bool result = impl::_photon(ctx, p, inbending, tightness);
-    record_selector_cuts("photon", ctx);
+    record_selector_cuts("photon", ctx, result);
     return result;
   }
 }  // namespace selectors
