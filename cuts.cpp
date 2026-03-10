@@ -420,10 +420,20 @@ namespace cuts {
       return edge_val > edge_cut;
     }
 
-    bool _DC_z_vertex_cut(clas12::region_particle* p) {
+    bool _DC_z_vertex_cut(clas12::region_particle* p, bool inbending) {
+      int sector = p->cal(clas12::PCAL)->getSector();
+
+      bounds vz_bounds_inb = {.upper = 2, .lower = -8};
+      bounds vz_bounds_outb = {.upper = 1, .lower = -11};
+
+      if (inbending) {
+        return vz_bounds_inb.lower < p->par()->getVz() && p->par()->getVz() < vz_bounds_inb.upper;
+      } else {
+        return vz_bounds_outb.lower < p->par()->getVz() && p->par()->getVz() < vz_bounds_outb.upper;
+      }
       // original DC_z_vertex_cut
       // isn't it already implemented in clas12::zVertexFilter ?
-      throw not_implemented_error("[DC_z_vertex_cut] Not implemented yet.");
+      // throw not_implemented_error("[DC_z_vertex_cut] Not implemented yet.");
 
       // // pass 2 (adjusted to cross sections)
 
@@ -476,9 +486,9 @@ namespace cuts {
     }
 
     bool _phot_EC_outer_vs_EC_inner_cut(clas12::region_particle* p) {
-      throw not_implemented_error("[phot_EC_outer_vs_EC_inner_cut] Not implemented yet.");
       double edep_min = 0.01;
       return (p->cal(clas12::ECIN)->getEnergy() + p->cal(clas12::ECOUT)->getEnergy()) > edep_min;
+      // throw not_implemented_error("[phot_EC_outer_vs_EC_inner_cut] Not implemented yet.");
     }
   }  // namespace FD::impl
 

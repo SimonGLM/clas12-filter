@@ -26,7 +26,7 @@ namespace cuts {
       bool _EC_hit_position_fiducial_cut_homogeneous(clas12::region_particle*, int tightness, bool inbending);
       bool _EC_outer_vs_EC_inner_cut(clas12::region_particle*, int tightness);
       bool _DC_fiducial_cut_edge(clas12::region_particle*, int region, bool inbending);
-      bool _DC_z_vertex_cut(clas12::region_particle*);
+      bool _DC_z_vertex_cut(clas12::region_particle*, bool);
       bool _phot_EC_sampling_fraction_cut(clas12::region_particle*);
       bool _phot_EC_outer_vs_EC_inner_cut(clas12::region_particle*);
 
@@ -53,7 +53,7 @@ namespace cuts {
                                                 bool) = cuts::FD::impl::_DC_fiducial_cut_edge_reg2;
     inline bool (*DC_fiducial_cut_edge_region3)(clas12::region_particle*,
                                                 bool) = cuts::FD::impl::_DC_fiducial_cut_edge_reg3;
-    inline bool (*DC_z_vertex_cut)(clas12::region_particle*) = cuts::FD::impl::_DC_z_vertex_cut;
+    inline bool (*DC_z_vertex_cut)(clas12::region_particle*, bool) = cuts::FD::impl::_DC_z_vertex_cut;
     inline bool (*phot_EC_sampling_fraction_cut)(clas12::region_particle*) =
         cuts::FD::impl::_phot_EC_sampling_fraction_cut;
     inline bool (*phot_EC_outer_vs_EC_inner_cut)(clas12::region_particle*) =
