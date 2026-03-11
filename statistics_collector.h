@@ -14,6 +14,8 @@ class StatisticsCollector {
     int invocations = 0;
     int rejections = 0;
 
+    int getInvocations() const { return invocations; }
+    int getRejections() const { return rejections; }
     int getAcceptance() const { return invocations - rejections; }
     double getRejectionRate() const { return rejections * 1. / invocations; }
   };
@@ -93,9 +95,9 @@ class StatisticsCollector {
                   [](const auto& a, const auto& b) { return a.second.invocations > b.second.invocations; });
 
         for (const auto& [cut_name, stats] : sorted_cuts) {
-          std::cout << std::format("    {:<43} | {:>15} | {:>15} | {:>15} | {:>13.2f}%", cut_name, stats.invocations,
-                                   stats.getAcceptance(), stats.rejections,
-                                   stats.invocations > 0 ? stats.getRejectionRate() * 100 : 0)
+          std::cout << std::format("    {:<43} | {:>15} | {:>15} | {:>15} | {:>13.2f}%", cut_name,
+                                   stats.getInvocations(), stats.getAcceptance(), stats.getRejections(),
+                                   stats.getInvocations() > 0 ? stats.getRejectionRate() * 100 : 0)
                     << std::endl;
         }
       }

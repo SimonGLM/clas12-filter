@@ -3,6 +3,9 @@
 #include "region_particle.h"
 
 namespace cuts {
+
+  enum tightness { loose, medium, tight };
+
   namespace generic {
     namespace impl {
       bool _forward_detector_cut(clas12::region_particle*);
@@ -23,8 +26,8 @@ namespace cuts {
     namespace impl {
       bool _HTCC_nphe_cut(clas12::region_particle*);
       bool _EC_sampling_fraction_cut(clas12::region_particle*, bool inbending, bool simulation, bool spring2019);
-      bool _EC_hit_position_fiducial_cut_homogeneous(clas12::region_particle*, int tightness, bool inbending);
-      bool _EC_outer_vs_EC_inner_cut(clas12::region_particle*, int tightness);
+      bool _EC_hit_position_fiducial_cut_homogeneous(clas12::region_particle*, tightness tightness, bool inbending);
+      bool _EC_outer_vs_EC_inner_cut(clas12::region_particle*, tightness tightness);
       bool _DC_fiducial_cut_edge(clas12::region_particle*, int region, bool inbending);
       bool _DC_z_vertex_cut(clas12::region_particle*, bool);
       bool _phot_EC_sampling_fraction_cut(clas12::region_particle*);
@@ -44,9 +47,10 @@ namespace cuts {
     inline bool (*HTCC_nphe_cut)(clas12::region_particle*) = cuts::FD::impl::_HTCC_nphe_cut;
     inline bool (*EC_sampling_fraction_cut)(clas12::region_particle*, bool, bool,
                                             bool) = cuts::FD::impl::_EC_sampling_fraction_cut;
-    inline bool (*EC_hit_position_fiducial_cut_homogeneous)(clas12::region_particle*, int, bool) =
+    inline bool (*EC_hit_position_fiducial_cut_homogeneous)(clas12::region_particle*, tightness, bool) =
         cuts::FD::impl::_EC_hit_position_fiducial_cut_homogeneous;
-    inline bool (*EC_outer_vs_EC_inner_cut)(clas12::region_particle*, int) = cuts::FD::impl::_EC_outer_vs_EC_inner_cut;
+    inline bool (*EC_outer_vs_EC_inner_cut)(clas12::region_particle*,
+                                            tightness) = cuts::FD::impl::_EC_outer_vs_EC_inner_cut;
     inline bool (*DC_fiducial_cut_edge_region1)(clas12::region_particle*,
                                                 bool) = cuts::FD::impl::_DC_fiducial_cut_edge_reg1;
     inline bool (*DC_fiducial_cut_edge_region2)(clas12::region_particle*,
@@ -94,12 +98,12 @@ namespace cuts {
   }  // namespace vertex
 
   namespace impl {
-    bool _phot_beta_cut(clas12::region_particle*, int tightness);
+    bool _phot_beta_cut(clas12::region_particle*, tightness tightness);
     bool _neutr_beta_cut(clas12::region_particle*, int run);
     bool _basic_FTOF_cut(clas12::region_particle*);
   }  // namespace impl
 
-  inline bool (*phot_beta_cut)(clas12::region_particle*, int) = cuts::impl::_phot_beta_cut;
+  inline bool (*phot_beta_cut)(clas12::region_particle*, tightness) = cuts::impl::_phot_beta_cut;
   inline bool (*neutr_beta_cut)(clas12::region_particle*, int) = cuts::impl::_neutr_beta_cut;
   inline bool (*basic_FTOF_cut)(clas12::region_particle*) = cuts::impl::_basic_FTOF_cut;
 }  // namespace cuts

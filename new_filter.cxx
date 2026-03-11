@@ -144,7 +144,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   // specify evaluation mode for selectors
   // EarlyReturn: Immediatly return on rejected cut,
   // CompleteTrace: check ALL cuts, then return
-  selectors::evaluation_mode = EvaluationMode::EarlyReturn;
+  selectors::evaluation_mode = EvaluationMode::CompleteTrace;
 
   // Event loop
   //////////////////////////////////////////////////////////////////////////////
@@ -155,8 +155,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   auto last_update = t0;
   const std::vector<int> particle_sequence = {11, 2212, 2112, 211, -211, 321, -321, 22};
   std::cout << std::format("Starting event loop for {} events...", events) << std::endl;
-  while (c12->next() && ((events != -1 && count < events) || (events == -1)))  // 15.4s in Loop (c12.next() 8.8s)
-  {
+  while (c12->next() && ((events != -1 && count < events) || (events == -1))) {
     // progress updates
     auto ti = steady_clock::now();
     if (duration_cast<seconds>(ti - last_update).count() >= progressInterval) {
@@ -196,7 +195,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
     //  1. Store particles in map to process in required order later
     //     1.1 If no electrons, skip event
     //  2. Loop over this map in particular particle order (e-, p, n, pi+, pi-, K+, K-)
-    //     2.1 Break loop if no valid electrons left
+    //     2.1 Break loop and reject event if no valid electrons remain
     //     2.2 Sort particles of this type by momentum
     //     2.3 If reference vertex not set, set it to highest momentum electron
     //         This is only done once we are processing something other than electrons and since we have
@@ -225,7 +224,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
         std::cout << std::format("{:<8s}: {:>2d}", pdg_name(pdg), particlesByPDG[pdg].size()) << std::endl;
 
     // --------------------------- 1.1 ---------------------------
-    if (particlesByPDG.at(11).size() == 0) {
+    if (particlesByPDG.at(11).empty()) {
       if (verbose) std::cout << "No electrons in event. Skipping event..." << std::endl;
       continue;
     }
@@ -235,13 +234,14 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
     if (verbose) std::cout << "Processing particles..." << std::endl;
     for (int pdg : particle_sequence) {
       // skip early if there are no particles of this pdg in the event
-      if (particlesByPDG[pdg].size() < 1) {
+      if (particlesByPDG[pdg].empty()) {
         // if (verbose) std::cout << "No " << pdg_name(pdg) << " in event. Skipping particle..." << std::endl;
         continue;
       }
 
       // --------------------------- 2.1 ---------------------------
-      if (pdg != 11 && particlesByPDG[11].size() == 0) {
+      // after we processed electrons (pdg!=11), do we have electrons left? No? Reject event.
+      if (pdg != 11 && particlesByPDG[11].empty()) {
         if (verbose) std::cout << "No valid electrons in event. Rejecting event..." << std::endl;
         break;
       }
@@ -277,9 +277,9 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
         // // ====================== PARTICLE CUTS ======================
         // check cuts with selector functions, if fail: remove from the event
         if (pdg == 11 && !selectors::electron(p, inbending, tightness)) {
-          if (verbose) std::cout << "Rejected electron" << std::endl;
           particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
                                     particlesByPDG[pdg].end());
+          if (verbose) std::cout << "Rejected electron" << std::endl;
           continue;
         }
         if (pdg == 2212 && !selectors::proton(p, inbending, tightness, reference_vertex)) {
@@ -335,7 +335,6 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
         if (particle_pdg == nullptr) continue;
 
         // ====================== MOMENTUM FIELDS ======================
-        // now we know particle_enum is a known particle, we can get away without std::optionals
         if (vars.fParticlesOfInterestForMomentumFields.contains(p->getPid())) {
           vars.AppendValue("p4_" + name + "_px", static_cast<double>(p->par()->getPx()));
           vars.AppendValue("p4_" + name + "_py", static_cast<double>(p->par()->getPy()));

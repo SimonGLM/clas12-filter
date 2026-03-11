@@ -311,9 +311,9 @@ namespace cuts {
       return pass_band && pass_triangle && pass_threshold;
     }
 
-    bool _EC_hit_position_fiducial_cut_homogeneous(clas12::region_particle* p, int tightness, bool inbending) {
+    bool _EC_hit_position_fiducial_cut_homogeneous(clas12::region_particle* p, tightness tightness, bool inbending) {
       // original EC_hit_position_fiducial_cut_homogeneous
-      if (tightness != 1 and tightness != 2 and tightness != 3)
+      if (tightness)
         throw std::runtime_error("[EC_hit_position_fiducial_cut_homogeneous] tightness must be 1, 2, or 3.");
 
       // Cut using the natural directions of the scintillator bars/ fibers:
@@ -366,12 +366,12 @@ namespace cuts {
       return (v >= bounds.v.lower && v <= bounds.v.upper && w >= bounds.w.lower && w <= bounds.w.upper);
     }
 
-    bool _EC_outer_vs_EC_inner_cut(clas12::region_particle* p, int tightness) {
+    bool _EC_outer_vs_EC_inner_cut(clas12::region_particle* p, tightness tightness) {
       // original *_EC_outer_vs_EC_inner_cut
       if (tightness != 1 and tightness != 2 and tightness != 3)
         throw std::runtime_error("[EC_outer_vs_EC_inner_cut] tightness must be 1, 2, or 3.");
 
-      std::array<double, 3> edep_min = {0.06, 0.07, 0.09};
+      std::array<double, 3> edep_min = {0.09, 0.07, 0.06};
 
       return p->cal(clas12::PCAL)->getEnergy() > edep_min[tightness - 1];
     }
@@ -586,7 +586,7 @@ namespace cuts {
   }  // namespace vertex::impl
 
   namespace impl {
-    bool _phot_beta_cut(clas12::region_particle* p, int tightness) {
+    bool _phot_beta_cut(clas12::region_particle* p, tightness tightness) {
       if (tightness != 1 and tightness != 2 and tightness != 3)
         throw std::runtime_error("[phot_beta_cut] tightness must be 1, 2, or 3.");
 
