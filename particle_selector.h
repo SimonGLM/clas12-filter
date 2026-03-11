@@ -140,7 +140,7 @@ namespace selectors {
 
   // Helper function to record cut history to statistics
   inline void record_selector_cuts(const std::string& selector_name, const ParticleContext& ctx, bool result) {
-    StatisticsCollector::record_selector_invocation(selector_name, !result);
+    StatisticsCollector::record_selector_invocation(selector_name, result);
     for (const auto& cut : ctx.get_cut_history()) {
       StatisticsCollector::record_cut_in_selector(selector_name, cut.name, cut.passed);
     }
