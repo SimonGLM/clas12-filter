@@ -165,11 +165,6 @@ namespace cuts {
       bool pass_threshold = (p->cal(clas12::PCAL)->getEnergy() / P) > threshold::value;
 
       // // final decision
-
-      if (pass_band) ++EC_SF_band;
-      if (pass_triangle) ++EC_SF_triangle;
-      if (pass_threshold) ++EC_SF_threshold;
-
       return pass_band && pass_triangle && pass_threshold;
     }
 
