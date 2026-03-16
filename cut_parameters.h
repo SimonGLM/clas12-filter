@@ -190,5 +190,82 @@ namespace cuts::parameters {
     namespace threshold {
       double value = 0.05;
     }  // namespace threshold
+
+    // phot_EC_sampling_fraction cut parameters:
+    bounds PHOT_SF_LIMITS = {0., 1.};
   }  // namespace EC_sampling_fraction
+  namespace PCAL_fiducial {
+
+    struct vw_bounds {
+      bounds v;
+      bounds w;
+    };
+
+    const std::vector<std::vector<vw_bounds>> FIDUCIAL = {  // inbending
+        {
+            // Loose
+            {{9.0, 400.0}, {9.0, 400.0}},
+            // Medium
+            {{14.0, 400.0}, {14.0, 400.0}},
+            // Tight
+            {{19.0, 400.0}, {19.0, 400.0}},
+        },
+        // outbending
+        {
+            // Loose
+            {{9.0, 400.0}, {9.0, 400.0}},
+            // Medium
+            {{14.0, 400.0}, {14.0, 400.0}},
+            // Tight
+            {{19.0, 400.0}, {19.0, 400.0}},
+        }};
+
+  }  // namespace PCAL_fiducial
+  namespace EC_outer_vs_EC_inner {
+    std::array<double, 3> MIN_EDEP = {0.06, 0.07, 0.09};
+    // phot_EC_outer_vs_EC_inner cut parameters:
+    double PHOT_MIN_EDEP = 0.01;
+  }  // namespace EC_outer_vs_EC_inner
+  namespace DC_fiducial {
+    using DCEdgeCuts = struct {
+      std::array<double, 3> inb;
+      std::array<double, 3> outb;
+    };
+    const std::map<int, DCEdgeCuts> FIDUCIAL = {
+        {11, {{5.0, 5.0, 10.0}, {3.0, 3.0, 10.0}}}, {2212, {{2.5, 2.5, 9.0}, {3.5, 3.0, 7.0}}},
+        {211, {{2.5, 2.5, 9.0}, {3.5, 2.5, 6.5}}},  {-211, {{3.5, 3.0, 7.0}, {2.5, 2.5, 10.0}}},
+        {321, {{2.5, 2.0, 9.0}, {3.5, 2.5, 6.5}}},  {-321, {{3.5, 2.5, 5.0}, {2.5, 2.5, 10.0}}}};
+
+  }  // namespace DC_fiducial
+  namespace DC_z_vertex {
+    bounds LIMITS_INB = {.lower = -8, .upper = 2};
+    bounds LIMITS_OUTB = {.lower = -11, .upper = 1};
+  }  // namespace DC_z_vertex
+  namespace FT_fiducial {
+    bounds THETA_LIMITS = {2.5, 4.5};
+  }
+  namespace FT_photid_FTCAL_fiducial {
+    bounds FIDUCIAL = {8, 15};
+    struct hole {
+      double x, y, r;
+    };
+    hole HOLE1{-8.5, +10, 1.5};
+    hole HOLE2{-10, -5, 1.5};
+    hole HOLE3{-6, -13.5, 2.};
+    hole HOLE4{+4, -6.7, 1.5};
+    hole HOLE5{+6, -6, 1.};
+
+  }  // namespace FT_photid_FTCAL_fiducial
+  namespace beta {
+    // neutr_beta cut parameters:
+    bounds NEUTR_BETA_LIMITS = {0., 0.95};
+
+    // phot_beta cut parameters:
+    double MOMENTUM_THRESHOLD = 0.10;
+    std::array<bounds, 3> PHOT_BETA_LIMITS = {{
+        {0.9, 2.0},   // loose
+        {0.9, 1.1},   // medium
+        {0.95, 1.05}  // tight
+    }};
+  }  // namespace beta
 }  // namespace cuts::parameters

@@ -66,6 +66,9 @@ namespace cuts {
 
   namespace FT {
     namespace impl {
+      bool _FT_photid_FTCAL_check_hole(double X, double Y, double holeX, double holeY, double holeR) {
+        pow(X - holeX, 2) + pow(Y - holeY, 2) - pow(holeR, 2) < 1;
+      };
       bool _FT_eid_FTCAL_fiducial_cut(clas12::region_particle*);
       bool _FT_eid_FTTRK_fiducial_cut(clas12::region_particle*);
       bool _FT_eid_FTHODO_fiducial_cut(clas12::region_particle*);
