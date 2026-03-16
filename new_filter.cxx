@@ -67,8 +67,20 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   c12->setVerbose();
   int events = numEvents != 0 ? numEvents : c12->getReader().getEntries();
 
-  // hipo::dictionary dict = c12->getDictionary();
-  // dict.show(); // Print all bank names
+  // General conditions
+  if (verbose) std::cout << "[C12] Setting up general run conditions..." << std::endl;
+  const std::vector<int> particle_sequence = {11, 2212, 2112, 211, -211, 321, -321, 22};
+  bool inbending = false;
+  int runnum = 5043;
+  cuts::tightness tightness = cuts::tightness::loose;
+
+  // specify evaluation mode for selectors
+  // EarlyReturn: Immediatly return on rejected cut,
+  // CompleteTrace: check ALL cuts, then return
+  selectors::evaluation_mode = EvaluationMode::CompleteTrace;
+  selectors::detector_flags[clas12::FT] = false;
+  selectors::detector_flags[clas12::FD] = true;
+  selectors::detector_flags[clas12::CD] = true;
 
   //////////////////////////////////////////////////////////////////////////////
   // CCDB + RCDB + QADB
@@ -91,22 +103,12 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   }
   //////////////////////////////////////////////////////////////////////////////
   // Apply QA requirements
-  std::cout << "[QADB] Applying QA requirements..." << std::endl;
-  c12->applyQA("pass2");
-  // c12->db()->qadb_requireOkForAsymmetry(true);  // From config
+  std::cout << "[QADB] Setting up QA requirements..." << std::endl;
+  c12->applyQA("latest");
+  // c12->db()->qadb_requireOkForAsymmetry(true);  // From config // Deprecated
   // c12->db()->qadb_requireGolden(true);          // From config
   // Is this needed in general or specific for every ana task?
   // Specific for ana task. Should be configurable from config.
-
-  // Preparations to have vec4's ready for iguana transforms
-  auto pdg_db = TDatabasePDG::Instance();
-  FourVector p4_el(0, 0, 0, pdg_db->GetParticle(11)->Mass());
-  FourVector p4_prot(0, 0, 0, pdg_db->GetParticle(2212)->Mass());
-  FourVector p4_neutr(0, 0, 0, pdg_db->GetParticle(2112)->Mass());
-  FourVector p4_pip(0, 0, 0, pdg_db->GetParticle(211)->Mass());
-  FourVector p4_pim(0, 0, 0, pdg_db->GetParticle(-211)->Mass());
-  FourVector p4_Kp(0, 0, 0, pdg_db->GetParticle(321)->Mass());
-  FourVector p4_Km(0, 0, 0, pdg_db->GetParticle(-321)->Mass());
 
   // // PREPARE OUTPUT
   //////////////////////////////////////////////////////////////////////////////
@@ -131,21 +133,6 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   if (verbose) std::cout << "[RNTuple] Creating RNTuple writer from model..." << std::endl;
   auto file = ROOT::RNTupleWriter::Recreate(std::move(vars.Model()), "nTupleName", tempfile);
 
-  // General conditions
-  if (verbose) std::cout << "[C12] Retrieving general run conditions..." << std::endl;
-
-  // THESE SEGFAULT !!!!
-  // bool inbending = c12->runconfig()->getTorus() > 0 ? true : false;  // or from RCDB?
-  // int runnum = c12->runconfig()->getRun();
-  bool inbending = false;  // temporary
-  int tightness = 1;
-  // !!!!!!!!!!!!!!!!!!!
-
-  // specify evaluation mode for selectors
-  // EarlyReturn: Immediatly return on rejected cut,
-  // CompleteTrace: check ALL cuts, then return
-  selectors::evaluation_mode = EvaluationMode::CompleteTrace;
-
   // Event loop
   //////////////////////////////////////////////////////////////////////////////
   int count = 0;
@@ -153,7 +140,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   auto t0 = steady_clock::now();
   uint last_count = 0;
   auto last_update = t0;
-  const std::vector<int> particle_sequence = {11, 2212, 2112, 211, -211, 321, -321, 22};
+  auto pdg_db = TDatabasePDG::Instance();
   std::cout << std::format("Starting event loop for {} events...", events) << std::endl;
   while (c12->next() && ((events != -1 && count < events) || (events == -1))) {
     // progress updates
@@ -414,67 +401,6 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
             << std::endl;
 
   std::cout << "done." << std::endl;
-
-  //////////////////////////////////////////////////////////////////////////////
-  // // Stale code
-  // // Keep for now as reference
-
-  // iguana::AlgorithmSequence seq;
-  // seq.Add<iguana::clas12::EventBuilderFilter>("pid_filter"); // Filter for PIDs from EventBuilder
-  // seq.SetOption("pid_filter", "log", "info");
-
-  // hipo::bank particles(dict.getSchema("REC::Particle"));
-  // for(int i =0; i<particles.getSize();i++){
-  //   float px = particles.getFloat("px",i);
-  //   float py = particles.getFloat("py",i);
-  //   float pz = particles.getFloat("pz",i);
-  //   float E = particles.getFloat("E",i);
-  //   fmt::print("{:<20} {:<20} {:<20} {:<20}\n",px,py,pz,E);
-  // }
-
-  // seq.Start(banks);
-
-  // auto b_config   = hipo::getBanklistIndex(banks, "RUN::config");
-  // auto b_particle = hipo::getBanklistIndex(banks, "REC::Particle");
-
-  // int iEvent = 0;
-  // // hipo::event evt;
-  // // while (reader.next()){
-  // while(reader.next(banks) && (numEvents == 0 || iEvent++ < numEvents)) {
-
-  //   auto& bank_config   = banks.at(b_config);
-  //   auto& bank_particle = banks.at(b_particle);
-
-  //   // print the event number
-  //   fmt::print("===== EVENT {} =====\n", bank_config.getInt("event", 0));
-
-  //   // print the particle bank before Iguana algorithms
-  //   fmt::print("----- BEFORE IGUANA -----\n");
-  //   bank_particle.show(); // the original particle bank
-
-  //   // run the sequence of Iguana algorithms
-  //   seq.Run(banks);
-
-  //   // print the banks after Iguana algorithms
-  //   fmt::print("----- AFTER IGUANA -----\n");
-  //   bank_particle.show(); // the filtered particle bank, with corrected momenta
-
-  //   // print a table; first the header
-  //   fmt::print("----- Analysis Particles -----\n");
-  //   fmt::print("  {:<20} {:<20} {:<20} {:<20}\n", "row == pindex", "PDG", "|p|", "sector");
-  //   // then print a row for each particle
-  //   // - use the `hipo::bank::getRowList()` method to loop over the bank rows that PASS the filter
-  //   // - if you'd rather loop over ALL bank rows, iterate from `i=0` up to `i < hipo::bank::getRows()` instead
-  //   for(auto const& row : bank_particle.getRowList()) {
-  //     auto p = std::hypot(
-  //         bank_particle.getFloat("px", row),
-  //         bank_particle.getFloat("py", row),
-  //         bank_particle.getFloat("pz", row));
-  //     auto pdg = bank_particle.getInt("pid", row);
-  //     fmt::print("  {:<20} {:<20} {:<20.3f}\n", row, pdg, p);
-  //   }
-  //   fmt::print("\n");
-  // }
 }
 
 int main(int argc, char** argv) {

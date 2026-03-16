@@ -4,7 +4,7 @@
 
 namespace cuts {
 
-  enum tightness { loose, medium, tight };
+  enum tightness { loose = 1, medium, tight };
 
   namespace generic {
     namespace impl {
@@ -85,9 +85,9 @@ namespace cuts {
 
   namespace CD {
     namespace impl {
-      bool _CD_neutr_beta_cut(clas12::region_particle*, int run);
+      [[maybe_unused]] bool _CD_neutr_beta_cut(clas12::region_particle*);
     }
-    inline bool (*CD_neutr_beta_cut)(clas12::region_particle*, int) = cuts::CD::impl::_CD_neutr_beta_cut;
+    [[maybe_unused]] inline bool (*CD_neutr_beta_cut)(clas12::region_particle*) = cuts::CD::impl::_CD_neutr_beta_cut;
   }  // namespace CD
 
   namespace vertex {
@@ -99,11 +99,11 @@ namespace cuts {
 
   namespace impl {
     bool _phot_beta_cut(clas12::region_particle*, tightness tightness);
-    bool _neutr_beta_cut(clas12::region_particle*, int run);
+    bool _neutr_beta_cut(clas12::region_particle*);
     bool _basic_FTOF_cut(clas12::region_particle*);
   }  // namespace impl
 
   inline bool (*phot_beta_cut)(clas12::region_particle*, tightness) = cuts::impl::_phot_beta_cut;
-  inline bool (*neutr_beta_cut)(clas12::region_particle*, int) = cuts::impl::_neutr_beta_cut;
+  inline bool (*neutr_beta_cut)(clas12::region_particle*) = cuts::impl::_neutr_beta_cut;
   inline bool (*basic_FTOF_cut)(clas12::region_particle*) = cuts::impl::_basic_FTOF_cut;
 }  // namespace cuts
