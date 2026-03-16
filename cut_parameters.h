@@ -7,6 +7,9 @@ namespace cuts::parameters {
     double lower;
     double upper;
   };
+  namespace HTCC_nphe {
+    ushort MIN_COUNT = 2;
+  }
   namespace EC_sampling_fraction {
     namespace band {
       struct BandParameterLUT {
@@ -21,7 +24,7 @@ namespace cuts::parameters {
         BandParameters p3;
       };
 
-      BandParameterLUT fall2018_inb = {
+      BandParameterLUT FALL18_INB = {
           .p0 = {.mean = {0.111767, 0.116619, 0.114606, 0.116586, 0.118251, 0.117391},
                  .sigma = {-0.00497609, 0.0259435, 0.0296159, 0.0161445, 0.0239166, 0.0244309}},
           .p1 = {.mean = {-0.0281943, 0.0662751, -0.0896597, 0.181465, 0.085993, 0.0186504},
@@ -32,7 +35,7 @@ namespace cuts::parameters {
                  .sigma = {-0.000173549, 0.00030325, 0.000380195, 0.00012328, 0.000302528, 0.000340911}}};
 
       // fall2018 outb:
-      BandParameterLUT fall2018_outb = {
+      BandParameterLUT FALL18_OUTB = {
           .p0 = {.mean = {0.111919, 0.11244, 0.11457, 0.124517, 0.109132, 0.115026},
                  .sigma = {-0.000828514, 0.019356, 0.023144, -0.000468566, 0.00500942, -0.00167471}},
           .p1 = {.mean = {-0.00764253, 0.156704, 0.246338, 0.880436, -0.181137, 0.335205},
@@ -43,7 +46,7 @@ namespace cuts::parameters {
                  .sigma = {-6.99914e-05, 0.000152666, 0.000164229, -0.000133009, -3.68797e-05,
                            -0.000107538}}};  // namespace band
       //   // spring2019:
-      BandParameterLUT spring2019 = {
+      BandParameterLUT SPRING19 = {
           .p0 = {.mean = {0.11253, 0.113735, 0.112401, 0.115128, 0.113048, 0.1147},
                  .sigma = {0.0193473, 0.0351352, 0.0234448, 0.0238342, 0.0382829, 0.0125166}},
           .p1 = {.mean = {-0.0689836, -0.044216, -0.160555, 0.108512, -0.153003, -0.0997027},
@@ -54,7 +57,7 @@ namespace cuts::parameters {
                  .sigma = {0.000165603, 0.000440174, 0.000274543, 0.000260158, 0.000508396, 0.000206116}}};
 
       //   // MC inb:
-      BandParameterLUT simulation_inb = {
+      BandParameterLUT SIMULATION_INB = {
           .p0 = {.mean = {0.118444, 0.118383, 0.118318, 0.118531, 0.117475, 0.119179},
                  .sigma = {0.0204537, 0.0242836, 0.0320663, 0.0171258, 0.0236728, 0.0157762}},
           .p1 = {.mean = {-0.0445042, -0.0326496, 0.00402908, 0.0384926, -0.0768068, 0.0045002},
@@ -65,7 +68,7 @@ namespace cuts::parameters {
                  .sigma = {0.000232288, 0.000277151, 0.000425544, 0.00018372, 0.000290388, 0.000160679}}};
 
       //   // MC outb:
-      BandParameterLUT simulation_outb = {
+      BandParameterLUT SIMULATION_OUTB = {
           .p0 = {.mean = {0.124075, 0.124086, 0.124071, 0.125947, 0.120091, 0.124457},
                  .sigma = {0.00231891, 0.000686535, 0.000327404, -0.000165373, 0.00376051, 0.000856615}},
           .p1 = {.mean = {0.259169, 0.257774, 0.286948, 0.449492, -0.0180208, 0.274625},
@@ -104,7 +107,7 @@ namespace cuts::parameters {
         }
       };
 
-      const TriangleParameterLUT fall18_inb = {
+      const TriangleParameterLUT FALL18_INB = {
           .sec1 = {.p0 = {1.41582, 1.39934, 1.41204, 1.46385, 1.55892, 1.55892, 1.55892, 1.55892},
                    .p1 = {0.212225, 0.215542, 0.217, 0.218279, 0.219881, 0.219881, 0.219881, 0.219881}},
           .sec2 = {.p0 = {1.44726, 1.44245, 1.47269, 1.53225, 1.61465, 1.61465, 1.61465, 1.61465},
@@ -117,11 +120,11 @@ namespace cuts::parameters {
                    .p1 = {0.22202, 0.227163, 0.228794, 0.226487, 0.218168, 0.218168, 0.218168, 0.218168}},
           .sec6 = {.p0 = {1.51312, 1.52784, 1.57519, 1.67332, 1.85128, 1.85128, 1.85128, 1.85128},
                    .p1 = {0.223651, 0.228082, 0.2305, 0.23241, 0.234238, 0.234238, 0.234238, 0.234238}},
-          .sectors = {&fall18_inb.sec1, &fall18_inb.sec2, &fall18_inb.sec3, &fall18_inb.sec4, &fall18_inb.sec5,
-                      &fall18_inb.sec6}};
+          .sectors = {&FALL18_INB.sec1, &FALL18_INB.sec2, &FALL18_INB.sec3, &FALL18_INB.sec4, &FALL18_INB.sec5,
+                      &FALL18_INB.sec6}};
       //
       // fall2018 outb:
-      const TriangleParameterLUT fall18_outb = {
+      const TriangleParameterLUT FALL18_OUTB = {
           .sec1 = {.p0 = {1.35967, 1.33697, 1.34111, 1.39563, 1.49066, 1.49066, 1.49066, 1.49066},
                    .p1 = {0.21934, 0.222755, 0.224377, 0.227803, 0.23137, 0.23137, 0.23137, 0.23137}},
           .sec2 = {.p0 = {1.36974, 1.36895, 1.39344, 1.46945, 1.61251, 1.61251, 1.61251, 1.61251},
@@ -134,11 +137,11 @@ namespace cuts::parameters {
                    .p1 = {0.218131, 0.222749, 0.225099, 0.225572, 0.224091, 0.224091, 0.224091, 0.224091}},
           .sec6 = {.p0 = {1.43741, 1.41924, 1.43218, 1.51807, 1.64554, 1.64554, 1.64554, 1.64554},
                    .p1 = {0.220976, 0.225786, 0.228382, 0.232594, 0.238174, 0.238174, 0.238174, 0.238174}},
-          .sectors = {&fall18_outb.sec1, &fall18_outb.sec2, &fall18_outb.sec3, &fall18_outb.sec4, &fall18_outb.sec5,
-                      &fall18_outb.sec6}};
+          .sectors = {&FALL18_OUTB.sec1, &FALL18_OUTB.sec2, &FALL18_OUTB.sec3, &FALL18_OUTB.sec4, &FALL18_OUTB.sec5,
+                      &FALL18_OUTB.sec6}};
 
       //   // spring 2019:
-      const TriangleParameterLUT spring19 = {
+      const TriangleParameterLUT SPRING19 = {
           .sec1 = {.p0 = {1.39979, 1.38131, 1.40144, 1.45945, 1.57144, 1.57144, 1.57144, 1.57144},
                    .p1 = {0.21633, 0.219878, 0.222027, 0.223849, 0.22592, 0.22592, 0.22592, 0.22592}},
           .sec2 = {.p0 = {1.55243, 1.55871, 1.61819, 1.72756, 1.89424, 1.89424, 1.89424, 1.89424},
@@ -151,9 +154,9 @@ namespace cuts::parameters {
                    .p1 = {0.219635, 0.223343, 0.224231, 0.221401, 0.210005, 0.210005, 0.210005, 0.210005}},
           .sec6 = {.p0 = {1.51755, 1.53504, 1.59927, 1.73397, 2.00518, 2.00518, 2.00518, 2.00518},
                    .p1 = {0.222143, 0.226195, 0.228638, 0.23086, 0.233709, 0.233709, 0.233709, 0.233709}},
-          .sectors = {&spring19.sec1, &spring19.sec2, &spring19.sec3, &spring19.sec4, &spring19.sec5, &spring19.sec6}};
+          .sectors = {&SPRING19.sec1, &SPRING19.sec2, &SPRING19.sec3, &SPRING19.sec4, &SPRING19.sec5, &SPRING19.sec6}};
 
-      const TriangleParameterLUT simulation_inb = {
+      const TriangleParameterLUT SIMULATION_INB = {
           .sec1 = {.p0 = {1.30263, 1.30977, 1.31412, 1.31338, 1.31648, 1.31648, 1.31648, 1.31648},
                    .p1 = {0.224593, 0.227935, 0.229518, 0.22978, 0.22924, 0.22924, 0.22924, 0.22924}},
           .sec2 = {.p0 = {1.30425, 1.30269, 1.30435, 1.30472, 1.29839, 1.29839, 1.29839, 1.29839},
@@ -166,12 +169,12 @@ namespace cuts::parameters {
                    .p1 = {0.224075, 0.226291, 0.225091, 0.22173, 0.217695, 0.217695, 0.217695, 0.217695}},
           .sec6 = {.p0 = {1.30049, 1.30766, 1.31197, 1.31372, 1.31596, 1.31596, 1.31596, 1.31596},
                    .p1 = {0.224591, 0.227901, 0.229503, 0.23, 0.229422, 0.229422, 0.229422, 0.229422}},
-          .sectors = {&simulation_inb.sec1, &simulation_inb.sec2, &simulation_inb.sec3, &simulation_inb.sec4,
-                      &simulation_inb.sec5, &simulation_inb.sec6}};
+          .sectors = {&SIMULATION_INB.sec1, &SIMULATION_INB.sec2, &SIMULATION_INB.sec3, &SIMULATION_INB.sec4,
+                      &SIMULATION_INB.sec5, &SIMULATION_INB.sec6}};
 
       //   // mc outb:
 
-      const TriangleParameterLUT simulation_outb = {
+      const TriangleParameterLUT SIMULATION_OUTB = {
           .sec1 = {.p0 = {1.34088, 1.34685, 1.34914, 1.3544, 1.35628, 1.35628, 1.35628, 1.35628},
                    .p1 = {0.229433, 0.232865, 0.234838, 0.236458, 0.237532, 0.237532, 0.237532, 0.237532}},
           .sec2 = {.p0 = {1.33865, 1.34439, 1.34938, 1.35247, 1.35423, 1.35423, 1.35423, 1.35423},
@@ -184,11 +187,11 @@ namespace cuts::parameters {
                    .p1 = {0.228946, 0.232535, 0.234382, 0.235812, 0.236718, 0.236718, 0.236718, 0.236718}},
           .sec6 = {.p0 = {1.34048, 1.3457, 1.34985, 1.35331, 1.35303, 1.35303, 1.35303, 1.35303},
                    .p1 = {0.229432, 0.232767, 0.234884, 0.236384, 0.237264, 0.237264, 0.237264, 0.237264}},
-          .sectors = {&simulation_outb.sec1, &simulation_outb.sec2, &simulation_outb.sec3, &simulation_outb.sec4,
-                      &simulation_outb.sec5, &simulation_outb.sec6}};
+          .sectors = {&SIMULATION_OUTB.sec1, &SIMULATION_OUTB.sec2, &SIMULATION_OUTB.sec3, &SIMULATION_OUTB.sec4,
+                      &SIMULATION_OUTB.sec5, &SIMULATION_OUTB.sec6}};
     }  // namespace triangle
     namespace threshold {
-      double value = 0.05;
+      double THRESHOLD = 0.05;
     }  // namespace threshold
 
     // phot_EC_sampling_fraction cut parameters:

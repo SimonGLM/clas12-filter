@@ -87,8 +87,9 @@ namespace cuts {
   namespace FD::impl {
     bool _HTCC_nphe_cut(clas12::region_particle* p) {
       // original CC_nphe_cut
-      double nphe_min = 2;
-      return p->che(clas12::HTCC)->getNphe() > nphe_min;
+      using namespace cuts::parameters::HTCC_nphe;
+
+      return MIN_COUNT < p->che(clas12::HTCC)->getNphe();
     }
 
     // TODO: move boolean arguments to infering from region_particle
@@ -102,13 +103,13 @@ namespace cuts {
       using namespace cuts::parameters::EC_sampling_fraction;
 
       // select the right LUT for the current conditions
-      const band::BandParameterLUT* band_LUT;
+      const band::BandParameterLUT* BAND_LUT;
       if (spring19)
-        band_LUT = &band::spring2019;
+        BAND_LUT = &band::SPRING19;
       else if (simulation) {
-        band_LUT = inbending ? &band::simulation_inb : &band::simulation_outb;
+        BAND_LUT = inbending ? &band::SIMULATION_INB : &band::SIMULATION_OUTB;
       } else {
-        band_LUT = inbending ? &band::fall2018_inb : &band::fall2018_outb;
+        BAND_LUT = inbending ? &band::FALL18_INB : &band::FALL18_OUTB;
       }
 
       // helper variables to make the formula more readable
@@ -121,10 +122,10 @@ namespace cuts {
       [[maybe_unused]] double sigma_range = 3.5;
 
       // calculate band
-      double mean = band_LUT->p0.mean[sector] * (1 + P / std::sqrt(P * P + band_LUT->p1.mean[sector])) +
-                    band_LUT->p2.mean[sector] * P + band_LUT->p3.mean[sector] * P * P;
-      double sigma = band_LUT->p0.sigma[sector] + band_LUT->p1.sigma[sector] / std::sqrt(P) +
-                     band_LUT->p2.sigma[sector] * P + band_LUT->p3.sigma[sector] * P * P;
+      double mean = BAND_LUT->p0.mean[sector] * (1 + P / std::sqrt(P * P + BAND_LUT->p1.mean[sector])) +
+                    BAND_LUT->p2.mean[sector] * P + BAND_LUT->p3.mean[sector] * P * P;
+      double sigma = BAND_LUT->p0.sigma[sector] + BAND_LUT->p1.sigma[sector] / std::sqrt(P) +
+                     BAND_LUT->p2.sigma[sector] * P + BAND_LUT->p3.sigma[sector] * P * P;
       // calulate cut limits
       bounds limits{.lower = mean - sigma_range * sigma, .upper = mean + sigma_range * sigma};
 
@@ -138,11 +139,11 @@ namespace cuts {
 
       const triangle::TriangleParameterLUT* tri_LUT;
       if (spring19) {
-        tri_LUT = &triangle::spring19;
+        tri_LUT = &triangle::SPRING19;
       } else if (simulation) {
-        tri_LUT = inbending ? &triangle::simulation_inb : &triangle::simulation_outb;
+        tri_LUT = inbending ? &triangle::SIMULATION_INB : &triangle::SIMULATION_OUTB;
       } else {
-        tri_LUT = inbending ? &triangle::fall18_inb : &triangle::fall18_outb;
+        tri_LUT = inbending ? &triangle::FALL18_INB : &triangle::FALL18_OUTB;
       }
 
       int energy_bin = P <= 3 ? 0 : P <= 4 ? 1 : P <= 5 ? 2 : P <= 6 ? 3 : P <= 7 ? 4 : P <= 8 ? 5 : P <= 9 ? 6 : 7;
@@ -162,7 +163,7 @@ namespace cuts {
       //////////////////////////////////////////////////////////////////////////////
       // threshold cut on SF PCAL
       //////////////////////////////////////////////////////////////////////////////
-      bool pass_threshold = (p->cal(clas12::PCAL)->getEnergy() / P) > threshold::value;
+      bool pass_threshold = (p->cal(clas12::PCAL)->getEnergy() / P) > threshold::THRESHOLD;
 
       // // final decision
       return pass_band && pass_triangle && pass_threshold;
