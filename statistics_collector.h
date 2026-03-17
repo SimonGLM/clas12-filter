@@ -73,8 +73,20 @@ class StatisticsCollector {
     // Convert selector registry to a vector and sort by invocations
     std::vector<std::pair<std::string, SelectorStats>> sorted_selectors(selector_registry().begin(),
                                                                         selector_registry().end());
-    std::sort(sorted_selectors.begin(), sorted_selectors.end(),
-              [](const auto& a, const auto& b) { return a.second.invocations > b.second.invocations; });
+    std::unordered_map<std::string, int> explicit_order = {{"electron", 0}, {"proton", 1},  {"neutron", 2},
+                                                           {"piplus", 3},   {"piminus", 4}, {"Kplus", 5},
+                                                           {"Kminus", 6},   {"photon", 7}};
+    std::sort(sorted_selectors.begin(), sorted_selectors.end(), [&](const auto& a, const auto& b) {
+      int idx1, idx2;
+      try {
+        idx1 = explicit_order.at(a.first);
+        idx2 = explicit_order.at(b.first);
+      } catch (std::out_of_range& e) {
+        // If either selector is not in the explicit order map, fall back to sorting by invocations
+        return a.second.invocations > b.second.invocations;
+      }
+      return idx1 < idx2;
+    });
 
     for (const auto& [selector_name, selector_stats] : sorted_selectors) {
       if (!selector_stats.cuts.empty()) {
