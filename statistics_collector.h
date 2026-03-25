@@ -65,7 +65,7 @@ class StatisticsCollector {
   static void print_hierarchical_statistics() {
     std::cout << "\n" << std::string(120, '=') << std::endl;
     std::cout << std::format("{:<47} | {:>15} | {:>15} | {:>15} | {:>15} ",
-                             "SELECTOR STATISTICS (with child cut usage)", "Invokations", "Accepted", "Rejected",
+                             "SELECTOR STATISTICS (with child cut usage)", "Invocations", "Accepted", "Rejected",
                              "Rejection rate")
               << std::endl;
     std::cout << std::string(120, '=') << std::endl;
