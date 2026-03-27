@@ -83,7 +83,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", int ru
   // EarlyReturn: Immediatly return on rejected cut,
   // CompleteTrace: check ALL cuts, then return
   selectors::evaluation_mode = EvaluationMode::CompleteTrace;
-  selectors::detector_flags[clas12::FT] = false;
+  selectors::detector_flags[clas12::FT] = false;  // ignored for photons
   selectors::detector_flags[clas12::FD] = true;
   selectors::detector_flags[clas12::CD] = true;
 
@@ -106,16 +106,13 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", int ru
   } else {
     c12->db()->SetRCDBLocalConnection(RCDB_CONNECTION);
   }
-  //////////////////////////////////////////////////////////////////////////////
-  // Apply QA requirements
   std::cout << "[QADB] Setting up QA requirements..." << std::endl;
-  c12->applyQA("latest");
-  // c12->db()->qadb_requireOkForAsymmetry(true);  // From config // Deprecated
-  // c12->db()->qadb_requireGolden(true);          // From config
-  // Is this needed in general or specific for every ana task?
-  // Specific for ana task. Should be configurable from config.
+  // c12->applyQA("latest");
+  // c12->db()->qadb_requireOkForAsymmetry(true);  // Future: from config file // Deprecated
+  // c12->db()->qadb_requireGolden(true);         // Future: from config file
 
-  // // PREPARE OUTPUT
+  //////////////////////////////////////////////////////////////////////////////
+  // PREPARE OUTPUT
   //////////////////////////////////////////////////////////////////////////////
   std::cout << "[DynamicVarStore] Initializing dynamic data structure..." << std::endl;
   std::unique_ptr<ROOT::RNTupleModel> model = ROOT::RNTupleModel::Create();
@@ -138,6 +135,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", int ru
   if (verbose) std::cout << "[RNTuple] Creating RNTuple writer from model..." << std::endl;
   auto file = ROOT::RNTupleWriter::Recreate(std::move(vars.Model()), "nTupleName", tempfile);
 
+  //////////////////////////////////////////////////////////////////////////////
   // Event loop
   //////////////////////////////////////////////////////////////////////////////
   int count = 0;
@@ -148,7 +146,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", int ru
   auto pdg_db = TDatabasePDG::Instance();
   std::cout << std::format("Starting event loop for {} events...", events) << std::endl;
   while (c12->next() && ((events != -1 && count < events) || (events == -1))) {
-    // progress updates
+    // progress bar and stats
     auto ti = steady_clock::now();
     if (duration_cast<seconds>(ti - last_update).count() >= progressInterval) {
       float time_remaining = duration_cast<milliseconds>(ti - t0).count() * (events * 1. / count - 1) / 1000.;
@@ -164,27 +162,22 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", int ru
     }
     count++;
 
-    // access variant stored in map with std::get<> and dereference the shared_ptr to set the that it holds.
     vars.SetValue("eventnumber", c12->runconfig()->getEvent());
     vars.SetValue("helicity", c12->event()->getHelicity());
     vars.SetValue("beam_charge", c12->event()->getBeamCharge());
 
-    // Clear Vector Fields
+    // Clear Vector Fields in wrapped RNTuple
     vars.ResetVectorFields();  // clear and reserve all vector fields
     double reference_vertex = std::numeric_limits<double>::quiet_NaN();
 
     // ====================== EVENT CUTS ======================
     // do cuts on event level here if needed
-    // something like EventBuilderFilter for example
+    // maybe Iguana in the future?
+    // Filter: ig.GetFilters().doAllFilters();
+    // Corrections: ig.GetTransformers().doAllCorrections();
+    // ========================================================
 
-    // maybe Iguana?
-    // Filter here
-    // ig.GetFilters().doAllFilters();
-
-    // Correct here
-    // ig.GetTransformers().doAllCorrections();
-
-    // ==========================================================
+    // ======================= WORK FLOW ========================
     //  1. Store particles in map to process in required order later
     //     1.1 If no electrons, skip event
     //  2. Loop over this map in particular particle order (e-, p, n, pi+, pi-, K+, K-)
