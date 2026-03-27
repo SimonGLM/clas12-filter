@@ -121,13 +121,16 @@ namespace cuts {
       }
 
       // helper variables to make the formula more readable
-      int sector = p->cal(clas12::PCAL)->getSector() - 1;
+      int sector = p->cal(clas12::PCAL)->getSector();
+      if (sector == 0) return false;  // exit early if no sector assigned
+      sector--;                       // convert to 0-index for LUT access
+
       double P = p->par()->getP();
       double total_ECAL_energy =
           p->cal(clas12::PCAL)->getEnergy() + p->cal(clas12::ECIN)->getEnergy() + p->cal(clas12::ECOUT)->getEnergy();
-      double sampling_fraction = total_ECAL_energy / P;
 
-      [[maybe_unused]] double sigma_range = 3.5;
+      double band_sampling_fraction = total_ECAL_energy / P;
+      double sigma_range = 3.5;
 
       // calculate band
       double mean = BAND_LUT->p0.mean[sector] * (1 + P / std::sqrt(P * P + BAND_LUT->p1.mean[sector])) +
@@ -137,7 +140,7 @@ namespace cuts {
       // calulate cut limits
       bounds limits{.lower = mean - sigma_range * sigma, .upper = mean + sigma_range * sigma};
 
-      bool pass_band = limits.lower <= sampling_fraction && sampling_fraction <= limits.upper;
+      bool pass_band = limits.lower <= band_sampling_fraction && band_sampling_fraction <= limits.upper;
 
       // std::cout << "SF band cut: " << limits.lower << " < " << sampling_fraction << " < " << limits.upper
       //           << " == " << pass_band << std::endl;
@@ -155,18 +158,14 @@ namespace cuts {
       }
 
       int energy_bin = P <= 3 ? 0 : P <= 4 ? 1 : P <= 5 ? 2 : P <= 6 ? 3 : P <= 7 ? 4 : P <= 8 ? 5 : P <= 9 ? 6 : 7;
-      int sec = p->cal(clas12::PCAL)->getSector() - 1;
 
-      double total_EC_energy =
-          p->cal(clas12::PCAL)->getEnergy() + p->cal(clas12::ECIN)->getEnergy() + p->cal(clas12::ECOUT)->getEnergy();
+      double p0 = tri_LUT->sectors[sector]->p0[energy_bin];
+      double p1 = tri_LUT->sectors[sector]->p1[energy_bin];
 
-      double p0 = tri_LUT->sectors[sec]->p0[energy_bin];
-      double p1 = tri_LUT->sectors[sec]->p1[energy_bin];
+      double tri_sampling_fraction = p->cal(clas12::PCAL)->getEnergy() / P;
 
       double triangle_cut_min = (p1 - p0 * p->cal(clas12::ECIN)->getEnergy() / P);
-      bool pass_triangle = triangle_cut_min < sampling_fraction;
-      // std::cout << "SF triangle cut: " << triangle_cut_min << " < " << sampling_fraction << " == " << pass_triangle
-      //           << std::endl;
+      bool pass_triangle = triangle_cut_min < tri_sampling_fraction;
 
       //////////////////////////////////////////////////////////////////////////////
       // threshold cut on SF PCAL
@@ -190,21 +189,35 @@ namespace cuts {
       double w = p->cal(clas12::PCAL)->getLw();
       [[maybe_unused]] double u = p->cal(clas12::PCAL)->getLu();
 
-      /// v + w is going from the side to the back end of the PCAL, u is going from
-      /// side to side 1 scintillator bar is 4.5 cm wide. In the outer regions
-      /// (back) double bars are used. a cut is only applied on v and w
-
-      // overrides for sector #4 (idx=3)
-      const vw_bounds LOOSE_SECTOR4_OVERRIDES = {{13.5, 400.0}, {9.0, 400.0}};
+      int sector = p->cal(clas12::PCAL)->getSector();
+      if (sector == 0) return false;  // exit early if no sector assigned
+      sector--;                       // convert to 0-index for LUT access
 
       // select the right bounds from the LUT
-      const vw_bounds cut_bounds = FIDUCIAL[inbending ? 0 : 1][tightness - 1];
+      const vw_bounds cut_bounds = FIDUCIAL[inbending ? 0 : 1][tightness - 1][sector];
 
-      // Override for sector 4 with loose tightness (TODO: reason unknown) (not for photons)
-      if (tightness == cuts::loose && p->cal(clas12::PCAL)->getSector() == 4 && p->par()->getPid() != 22) {
-        return (LOOSE_SECTOR4_OVERRIDES.v.lower < v && v < LOOSE_SECTOR4_OVERRIDES.v.upper &&
-                LOOSE_SECTOR4_OVERRIDES.w.lower < w && w < LOOSE_SECTOR4_OVERRIDES.w.upper);
-      }
+      return (cut_bounds.v.lower < v && v < cut_bounds.v.upper && cut_bounds.w.lower < w && w < cut_bounds.w.upper);
+    }
+
+    bool phot_EC_hit_position_fiducial_cut(clas12::region_particle* p, tightness tightness, bool inbending) {
+      // pretty much identical to EC_hit_position_fiducial_cut_homogeneous except for the 13.5 override value
+      using namespace cuts::parameters::PCAL_fiducial;
+
+      if (tightness != cuts::loose and tightness != cuts::medium and tightness != cuts::tight)
+        throw std::runtime_error(
+            "[phot_EC_hit_position_fiducial_cut] tightness must be cuts::tightness::loose, "
+            "cuts::tightness::medium, or cuts::tightness::tight.");
+      // Cut using the natural directions of the scintillator bars/ fibers:
+      double v = p->cal(clas12::PCAL)->getLv();
+      double w = p->cal(clas12::PCAL)->getLw();
+      [[maybe_unused]] double u = p->cal(clas12::PCAL)->getLu();
+
+      // select the right bounds from the LUT
+      int sector = p->cal(clas12::PCAL)->getSector();
+      if (sector == 0) return false;  // exit early if no sector assigned
+      sector--;                       // convert to 0-index for LUT access
+
+      const vw_bounds cut_bounds = PHOT_FIDUCIAL[inbending ? 0 : 1][tightness - 1][sector];
 
       return (cut_bounds.v.lower < v && v < cut_bounds.v.upper && cut_bounds.w.lower < w && w < cut_bounds.w.upper);
     }
@@ -259,11 +272,13 @@ namespace cuts {
     bool DC_z_vertex_cut(clas12::region_particle* p, bool inbending) {
       using namespace cuts::parameters::DC_z_vertex;
       int sector = p->cal(clas12::PCAL)->getSector();
+      if (sector == 0) return false;  // exit early if no sector assigned
+      sector--;                       // convert to 0-index for LUT access
 
       if (inbending) {
-        return LIMITS_INB.lower < p->par()->getVz() && p->par()->getVz() < LIMITS_INB.upper;
+        return LIMITS_INB[sector].lower < p->par()->getVz() && p->par()->getVz() < LIMITS_INB[sector].upper;
       } else {
-        return LIMITS_OUTB.lower < p->par()->getVz() && p->par()->getVz() < LIMITS_OUTB.upper;
+        return LIMITS_OUTB[sector].lower < p->par()->getVz() && p->par()->getVz() < LIMITS_OUTB[sector].upper;
       }
     }
 
@@ -312,11 +327,11 @@ namespace cuts {
       double clusY = p->ft(clas12::FTCAL)->getY();
       ROOT::Math::XYZVector V3ECalPos(clusX, clusY, 0);
 
-      bool in_hole1 = FT_photid_FTCAL_check_hole(clusX, clusY, HOLE1.x, HOLE1.y, HOLE1.r);
-      bool in_hole2 = FT_photid_FTCAL_check_hole(clusX, clusY, HOLE2.x, HOLE2.y, HOLE2.r);
-      bool in_hole3 = FT_photid_FTCAL_check_hole(clusX, clusY, HOLE3.x, HOLE3.y, HOLE3.r);
-      bool in_hole4 = FT_photid_FTCAL_check_hole(clusX, clusY, HOLE4.x, HOLE4.y, HOLE4.r);
-      bool in_hole5 = FT_photid_FTCAL_check_hole(clusX, clusY, HOLE5.x, HOLE5.y, HOLE5.r);
+      bool in_hole1 = helper_check_photo_FTCAL_hole(clusX, clusY, HOLE1.x, HOLE1.y, HOLE1.r);
+      bool in_hole2 = helper_check_photo_FTCAL_hole(clusX, clusY, HOLE2.x, HOLE2.y, HOLE2.r);
+      bool in_hole3 = helper_check_photo_FTCAL_hole(clusX, clusY, HOLE3.x, HOLE3.y, HOLE3.r);
+      bool in_hole4 = helper_check_photo_FTCAL_hole(clusX, clusY, HOLE4.x, HOLE4.y, HOLE4.r);
+      bool in_hole5 = helper_check_photo_FTCAL_hole(clusX, clusY, HOLE5.x, HOLE5.y, HOLE5.r);
 
       return FIDUCIAL.lower < V3ECalPos.R() && V3ECalPos.R() < FIDUCIAL.upper && !in_hole1 && !in_hole2 && !in_hole3 &&
              !in_hole4 && !in_hole5;

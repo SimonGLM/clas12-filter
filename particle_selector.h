@@ -8,6 +8,7 @@
   if (!ctx.apply_cut(name, func, __VA_ARGS__)) return ctx.passed()
 
 namespace selectors {
+  // Selector setting defaults, can be overwriten anywhere after #include "particle_selector.h"
   EvaluationMode evaluation_mode = EvaluationMode::EarlyReturn;
   std::map<int, bool> detector_flags = {{clas12::FT, true}, {clas12::FD, true}, {clas12::CD, true}};
 
@@ -27,8 +28,6 @@ namespace selectors {
         CHECK_CUT(ctx, "DC_fiducial_cut_edge_region2", cuts::FD::impl::DC_fiducial_cut_edge_reg2, p, inbending);
         CHECK_CUT(ctx, "DC_fiducial_cut_edge_region3", cuts::FD::impl::DC_fiducial_cut_edge_reg3, p, inbending);
         CHECK_CUT(ctx, "DC_z_vertex_cut", cuts::FD::impl::DC_z_vertex_cut, p, inbending);
-        // CHECK_CUT(ctx, "is_in_FD_check", []([[maybe_unused]] auto p) { return true; }, true); // just collect
-        // statistics on FD counts
       }
       if (p->getRegion() == clas12::CD && detector_flags[clas12::CD]) {
         // no cuts specified
@@ -83,7 +82,7 @@ namespace selectors {
 
     bool piplus(ParticleContext& ctx, clas12::region_particle* p, bool inbending, cuts::tightness tightness,
                 double reference_vertex_z) {
-      // if (!ctx.apply_cut("PID_cut(211)", cuts::generic::impl::PID_cut, p, 211)) return ctx.passed();
+      // CHECK_CUT(ctx,"PID_cut(211)", cuts::generic::impl::PID_cut, p, 211);
       // CHECK_CUT(ctx, "charge_cut(+1)", cuts::generic::impl::charge_cut, p, +1);
 
       if (p->getRegion() == clas12::FD && detector_flags[clas12::FD]) {
@@ -103,7 +102,7 @@ namespace selectors {
 
     bool piminus(ParticleContext& ctx, clas12::region_particle* p, bool inbending, cuts::tightness tightness,
                  double reference_vertex_z) {
-      // if (!ctx.apply_cut("PID_cut(-211)", cuts::generic::impl::PID_cut, p, -211)) return ctx.passed();
+      // CHECK_CUT(ctx,"PID_cut(-211)", cuts::generic::impl::PID_cut, p, 211);
       // CHECK_CUT(ctx, "charge_cut(-1)", cuts::generic::impl::charge_cut, p, -1);
 
       if (p->getRegion() == clas12::FD && detector_flags[clas12::FD]) {
@@ -149,8 +148,8 @@ namespace selectors {
       // CHECK_CUT(ctx, "charge_cut(-1)", cuts::generic::impl::charge_cut, p, -1);
 
       if (p->getRegion() == clas12::FD && detector_flags[clas12::FD]) {
-        // CHECK_CUT(ctx, "EC_outer_vs_EC_inner_cut", cuts::FD::impl::EC_outer_vs_EC_inner_cut, p, tightness); //
         // ignored in old filter
+        // CHECK_CUT(ctx, "EC_outer_vs_EC_inner_cut", cuts::FD::impl::EC_outer_vs_EC_inner_cut, p, tightness); //
         CHECK_CUT(ctx, "DC_fiducial_cut_edge_region1", cuts::FD::impl::DC_fiducial_cut_edge_reg1, p, inbending);
         CHECK_CUT(ctx, "DC_fiducial_cut_edge_region2", cuts::FD::impl::DC_fiducial_cut_edge_reg2, p, inbending);
         CHECK_CUT(ctx, "DC_fiducial_cut_edge_region3", cuts::FD::impl::DC_fiducial_cut_edge_reg3, p, inbending);
@@ -171,8 +170,8 @@ namespace selectors {
 
       if (p->getRegion() == clas12::FD && detector_flags[clas12::FD]) {
         CHECK_CUT(ctx, "phot_beta_cut", cuts::impl::phot_beta_cut, p, cuts::tightness::medium);
-        CHECK_CUT(ctx, "EC_hit_position_fiducial_cut_homogeneous",
-                  cuts::FD::impl::EC_hit_position_fiducial_cut_homogeneous, p, cuts::tightness::medium, inbending);
+        CHECK_CUT(ctx, "EC_hit_position_fiducial_cut_homogeneous", cuts::FD::impl::phot_EC_hit_position_fiducial_cut, p,
+                  cuts::tightness::medium, inbending);
         // rest of cuts are computed but ignored in old filter
         // CHECK_CUT(ctx, "phot_EC_sampling_fraction_cut", cuts::FD::impl::phot_EC_sampling_fraction_cut, p);
         // CHECK_CUT(ctx, "phot_EC_outer_vs_EC_inner_cut", cuts::FD::impl::phot_EC_outer_vs_EC_inner_cut, p);
@@ -180,7 +179,7 @@ namespace selectors {
       if (p->getRegion() == clas12::CD && detector_flags[clas12::CD]) {
         // no cuts specified
       }
-      if (p->getRegion() == clas12::FT && detector_flags[clas12::FT]) {
+      if (p->getRegion() == clas12::FT) {  // ignore detector_flags, always use FT for photons
         CHECK_CUT(ctx, "FT_photid_FTCAL_fiducial_cut", cuts::FT::impl::FT_photid_FTCAL_fiducial_cut, p);
         CHECK_CUT(ctx, "FT_photid_beta_cut", cuts::FT::impl::FT_photid_beta_cut, p);
       }

@@ -29,6 +29,7 @@ namespace cuts {
       bool HTCC_nphe_cut(clas12::region_particle*);
       bool EC_sampling_fraction_cut(clas12::region_particle*, bool inbending, bool simulation, bool spring2019);
       bool EC_hit_position_fiducial_cut_homogeneous(clas12::region_particle*, tightness tightness, bool inbending);
+      bool phot_EC_hit_position_fiducial_cut(clas12::region_particle*, tightness tightness, bool inbending);
       bool EC_outer_vs_EC_inner_cut(clas12::region_particle*, tightness tightness);
       bool DC_fiducial_cut_edge(clas12::region_particle*, int region, bool inbending);
       bool DC_z_vertex_cut(clas12::region_particle*, bool);
@@ -68,7 +69,7 @@ namespace cuts {
 
   namespace FT {
     namespace impl {
-      bool FT_photid_FTCAL_check_hole(double X, double Y, double holeX, double holeY, double holeR) {
+      bool helper_check_photo_FTCAL_hole(double X, double Y, double holeX, double holeY, double holeR) {
         return pow(X - holeX, 2) + pow(Y - holeY, 2) - pow(holeR, 2) < 1;
       };
       bool FT_eid_FTCAL_fiducial_cut(clas12::region_particle*);
