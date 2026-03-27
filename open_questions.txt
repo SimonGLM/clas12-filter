@@ -1,0 +1,11 @@
+ - more particles of each species are found than in the old filter, even without cuts!
+   Especially neutrons & Km: new_filter has +64% more neutrons and +167% more Km than old before cuts
+
+ - delta_vz_cut was formerly known as DC_delta_vz_cut. Why?
+   The vertex is not something that has to do with the DC...
+
+ - cut_extend_neutron==true bypasses cuts in an unexpected way:
+   if P<2 consider neutr_beta_cut
+   if P>2 ignore neutr_beta_cut
+   but cut_extend_neutron==false still applies hidden momentum cut >0.05
+   =>momentum_cut as counter measure
