@@ -15,7 +15,8 @@ class ParticleContext {
  private:
   EvaluationMode mode;
   std::vector<CutResult> cut_history;
-  bool overall_passed = true;
+  bool overall_passed = false;
+  bool any_failed = false;
 
  public:
   ParticleContext(EvaluationMode mode = EvaluationMode::EarlyReturn) : mode(mode) {}
@@ -25,8 +26,14 @@ class ParticleContext {
     bool result = cut_func(std::forward<Args>(args)...);
     cut_history.push_back({cut_name, result});
 
-    if (!result) {
+    if (result && !any_failed) {
+      // this cut passed, and no previous cut has failed.
+      // until one fails, we set:
+      overall_passed = true;
+    }
+    if (!result && !any_failed) {
       overall_passed = false;
+      any_failed = true;
       return mode == EvaluationMode::CompleteTrace;  // continue if tracing, stop if early-return
     }
     return true;  // continue regardless
