@@ -57,9 +57,16 @@ using FourVector = ROOT::Math::PxPyPzMVector;
 
 //////////////////////////////////////////////////////////////////////////////
 // No argument overload if used without arguments
-void new_filter() { std::cout << "Called without arguments." << std::endl; }
+void new_filter() {
+  std::cout << "Called without arguments. " << std::endl << std::endl;
+  std::cout << "Usage: clas12root [options] 'new_filter.cxx+(<input_file>, <output_file>, <run_number>, <inbending>, "
+               "<num_events>)'"
+            << std::endl;
+}
+//////////////////////////////////////////////////////////////////////////////
 
-void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint numEvents = 0) {
+void new_filter(std::string inFile, std::string outputfile = "/dev/null", int runnum = 5043, bool inbending = false,
+                uint numEvents = 0) {
   bool verbose = false;
 
   ROOT::EnableImplicitMT();
@@ -70,8 +77,6 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
   // General conditions
   if (verbose) std::cout << "[C12] Setting up general run conditions..." << std::endl;
   const std::vector<int> particle_sequence = {11, 2212, 2112, 211, -211, 321, -321, 22};
-  bool inbending = false;
-  int runnum = 5043;
   cuts::tightness tightness = cuts::tightness::loose;
 
   // specify evaluation mode for selectors
