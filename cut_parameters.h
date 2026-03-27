@@ -1,6 +1,7 @@
 #pragma once
 #include <array>
 #include <map>
+#include <vector>
 
 namespace cuts::parameters {
   struct bounds {
@@ -8,7 +9,7 @@ namespace cuts::parameters {
     double upper;
   };
   namespace HTCC_nphe {
-    ushort MIN_COUNT = 2;
+    unsigned short MIN_COUNT = 2;
   }
   namespace EC_sampling_fraction {
     namespace band {
@@ -265,7 +266,7 @@ namespace cuts::parameters {
 
     // phot_beta cut parameters:
     double MOMENTUM_THRESHOLD = 0.10;
-    std::array<bounds, 3> PHOT_BETA_LIMITS = {{
+    std::array<bounds, 3> PHOTO_BETA_LIMITS = {{
         {0.9, 2.0},   // loose
         {0.9, 1.1},   // medium
         {0.95, 1.05}  // tight

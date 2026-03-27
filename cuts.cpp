@@ -14,25 +14,26 @@ using bounds = cuts::parameters::bounds;
 
 namespace cuts {
   namespace generic::impl {
-    bool _forward_detector_cut(clas12::region_particle* p) {
+    bool forward_detector_cut(clas12::region_particle* p) {
       int det = abs(p->par()->getStatus());
       // clas12::FD<= det && det < clas12::CD;  // enum missmatch?
       return (2000 <= det && det < 4000);
     }
 
-    bool _central_detector_cut(clas12::region_particle* p) {
+    bool central_detector_cut(clas12::region_particle* p) {
       int det = abs(p->par()->getStatus());
       return (4000 <= det && det < 5000);
     }
 
-    bool _forward_tagger_cut(clas12::region_particle* p) {
+    bool forward_tagger_cut(clas12::region_particle* p) {
       int det = abs(p->par()->getStatus());
       return (1000 <= det && det < 2000);
     }
 
-    bool _PID_cut(clas12::region_particle* p, int pid) { return p->par()->getPid() == pid; }
+    bool PID_cut(clas12::region_particle* p, int pid) { return p->par()->getPid() == pid; }
 
-    bool _charge_cut(clas12::region_particle* p, int charge) { return p->par()->getCharge() == charge; }
+    bool charge_cut(clas12::region_particle* p, int charge) { return p->par()->getCharge() == charge; }
+
 
     // bool vertex_cut(clas12::region_particle* p, int runnum) {
     //   // from tbhayward/clas12_analysis_software
@@ -85,7 +86,7 @@ namespace cuts {
   }  // namespace generic::impl
 
   namespace FD::impl {
-    bool _HTCC_nphe_cut(clas12::region_particle* p) {
+    bool HTCC_nphe_cut(clas12::region_particle* p) {
       // original CC_nphe_cut
       using namespace cuts::parameters::HTCC_nphe;
 
@@ -93,12 +94,9 @@ namespace cuts {
     }
 
     // TODO: move boolean arguments to infering from region_particle
-    bool _EC_sampling_fraction_cut(clas12::region_particle* p, bool inbending = false, bool simulation = false,
-                                   bool spring19 = false) {
+    bool EC_sampling_fraction_cut(clas12::region_particle* p, bool inbending = false, bool simulation = false,
+                                  bool spring19 = false) {
       // original EC_sampling_fraction_cut
-      //////////////////////////////////////////////////////////////////////////////
-      // band cut on SF PCAL (array entries are sectors)
-      //////////////////////////////////////////////////////////////////////////////
 
       using namespace cuts::parameters::EC_sampling_fraction;
 
@@ -169,7 +167,7 @@ namespace cuts {
       return pass_band && pass_triangle && pass_threshold;
     }
 
-    bool _EC_hit_position_fiducial_cut_homogeneous(clas12::region_particle* p, tightness tightness, bool inbending) {
+    bool EC_hit_position_fiducial_cut_homogeneous(clas12::region_particle* p, tightness tightness, bool inbending) {
       // original EC_hit_position_fiducial_cut_homogeneous
       using namespace cuts::parameters::PCAL_fiducial;
 
@@ -192,11 +190,7 @@ namespace cuts {
       // select the right bounds from the LUT
       const vw_bounds cut_bounds = FIDUCIAL[inbending ? 0 : 1][tightness - 1];
 
-      // std::cout << "v bounds: " << cut_bounds.v.lower << " < " << v << " < " << cut_bounds.v.upper
-      //           << " == " << (cut_bounds.v.lower < v && v <= cut_bounds.v.upper) << std::endl;
-      // std::cout << "w bounds: " << cut_bounds.w.lower << " < " << w << " < " << cut_bounds.w.upper
-      //           << " == " << (cut_bounds.w.lower < w && w <= cut_bounds.w.upper) << std::endl;
-      // Override for sector 4 with loose tightness (TODO: reason unkown) (not for photons)
+      // Override for sector 4 with loose tightness (TODO: reason unknown) (not for photons)
       if (tightness == cuts::loose && p->cal(clas12::PCAL)->getSector() == 4 && p->par()->getPid() != 22) {
         return (LOOSE_SECTOR4_OVERRIDES.v.lower < v && v < LOOSE_SECTOR4_OVERRIDES.v.upper &&
                 LOOSE_SECTOR4_OVERRIDES.w.lower < w && w < LOOSE_SECTOR4_OVERRIDES.w.upper);
@@ -205,22 +199,22 @@ namespace cuts {
       return (cut_bounds.v.lower < v && v < cut_bounds.v.upper && cut_bounds.w.lower < w && w < cut_bounds.w.upper);
     }
 
-    bool _EC_outer_vs_EC_inner_cut(clas12::region_particle* p, tightness tightness) {
+    bool EC_outer_vs_EC_inner_cut(clas12::region_particle* p, tightness tightness) {
       // original *_EC_outer_vs_EC_inner_cut
       using namespace cuts::parameters::EC_outer_vs_EC_inner;
       if (tightness != cuts::loose and tightness != cuts::medium and tightness != cuts::tight)
         throw std::runtime_error(
             "[EC_outer_vs_EC_inner_cut] tightness must be cuts::tightness::loose, cuts::tightness::medium, or "
             "cuts::tightness::tight.");
-      return p->cal(clas12::PCAL)->getEnergy() > MIN_EDEP[tightness - 1];
+      return MIN_EDEP[tightness - 1] < p->cal(clas12::PCAL)->getEnergy();
     }
 
-    bool _DC_fiducial_cut_edge(clas12::region_particle* p, int region, bool inbending) {
+    bool DC_fiducial_cut_edge(clas12::region_particle* p, int region, bool inbending) {
       // original DC_fiducial_cut_edge
       using namespace cuts::parameters::DC_fiducial;
-      if (!cuts::generic::impl::_PID_cut(p, 11) && !cuts::generic::impl::_PID_cut(p, 2212) &&
-          !cuts::generic::impl::_PID_cut(p, 211) && !cuts::generic::impl::_PID_cut(p, -211) &&
-          !cuts::generic::impl::_PID_cut(p, 321) && !cuts::generic::impl::_PID_cut(p, -321)) {
+      if (!cuts::generic::impl::PID_cut(p, 11) && !cuts::generic::impl::PID_cut(p, 2212) &&
+          !cuts::generic::impl::PID_cut(p, 211) && !cuts::generic::impl::PID_cut(p, -211) &&
+          !cuts::generic::impl::PID_cut(p, 321) && !cuts::generic::impl::PID_cut(p, -321)) {
         throw std::domain_error(
             std::format("[DC_fiducial_cut_edge] Attempting cut on invalid PID '{}' for this cut.", p->getPid()));
       }
@@ -252,7 +246,7 @@ namespace cuts {
       return edge_val > edge_cut;
     }
 
-    bool _DC_z_vertex_cut(clas12::region_particle* p, bool inbending) {
+    bool DC_z_vertex_cut(clas12::region_particle* p, bool inbending) {
       using namespace cuts::parameters::DC_z_vertex;
       int sector = p->cal(clas12::PCAL)->getSector();
 
@@ -263,7 +257,7 @@ namespace cuts {
       }
     }
 
-    bool _phot_EC_sampling_fraction_cut(clas12::region_particle* p) {
+    bool phot_EC_sampling_fraction_cut(clas12::region_particle* p) {
       using namespace cuts::parameters::EC_sampling_fraction;
 
       double pcal = p->cal(clas12::PCAL)->getEnergy();
@@ -275,56 +269,55 @@ namespace cuts {
       return (PHOT_SF_LIMITS.lower < cutvalue && cutvalue < PHOT_SF_LIMITS.upper);
     }
 
-    bool _phot_EC_outer_vs_EC_inner_cut(clas12::region_particle* p) {
+    bool phot_EC_outer_vs_EC_inner_cut(clas12::region_particle* p) {
       using namespace cuts::parameters::EC_outer_vs_EC_inner;
       return PHOT_MIN_EDEP < (p->cal(clas12::ECIN)->getEnergy() + p->cal(clas12::ECOUT)->getEnergy());
-      // throw not_implemented_error("[phot_EC_outer_vs_EC_inner_cut] Not implemented yet.");
     }
   }  // namespace FD::impl
 
   namespace FT::impl {
 
-    bool _FT_eid_FTCAL_fiducial_cut(clas12::region_particle* p) {
+    bool FT_eid_FTCAL_fiducial_cut(clas12::region_particle* p) {
       using namespace cuts::parameters::FT_fiducial;
       double theta = std::acos(p->par()->getPz() / p->par()->getP()) * 180 / std::numbers::pi;
 
       return THETA_LIMITS.lower < theta && theta < THETA_LIMITS.upper;
     }
 
-    bool _FT_eid_FTTRK_fiducial_cut(clas12::region_particle* p) {
+    bool FT_eid_FTTRK_fiducial_cut(clas12::region_particle* p) {
       // same as FT_eid_FTCAL_fiducial_cut
-      return _FT_eid_FTCAL_fiducial_cut(p);
+      return FT_eid_FTCAL_fiducial_cut(p);
     }
 
-    bool _FT_eid_FTHODO_fiducial_cut(clas12::region_particle* p) {
+    bool FT_eid_FTHODO_fiducial_cut(clas12::region_particle* p) {
       // same as FT_eid_FTCAL_fiducial_cut
-      return _FT_eid_FTCAL_fiducial_cut(p);
+      return FT_eid_FTCAL_fiducial_cut(p);
     }
 
-    bool _FT_eid_energy_vs_radius_cut([[maybe_unused]] clas12::region_particle* _) { return true; }
+    bool FT_eid_energy_vs_radius_cut([[maybe_unused]] clas12::region_particle* _) { return true; }
 
-    bool _FT_photid_FTCAL_fiducial_cut(clas12::region_particle* p) {
+    bool FT_photid_FTCAL_fiducial_cut(clas12::region_particle* p) {
       using namespace cuts::parameters::FT_photid_FTCAL_fiducial;
       double clusX = p->ft(clas12::FTCAL)->getX();
       double clusY = p->ft(clas12::FTCAL)->getY();
       ROOT::Math::XYZVector V3ECalPos(clusX, clusY, 0);
 
-      bool in_hole1 = _FT_photid_FTCAL_check_hole(clusX, clusY, HOLE1.x, HOLE1.y, HOLE1.r);
-      bool in_hole2 = _FT_photid_FTCAL_check_hole(clusX, clusY, HOLE2.x, HOLE2.y, HOLE2.r);
-      bool in_hole3 = _FT_photid_FTCAL_check_hole(clusX, clusY, HOLE3.x, HOLE3.y, HOLE3.r);
-      bool in_hole4 = _FT_photid_FTCAL_check_hole(clusX, clusY, HOLE4.x, HOLE4.y, HOLE4.r);
-      bool in_hole5 = _FT_photid_FTCAL_check_hole(clusX, clusY, HOLE5.x, HOLE5.y, HOLE5.r);
+      bool in_hole1 = FT_photid_FTCAL_check_hole(clusX, clusY, HOLE1.x, HOLE1.y, HOLE1.r);
+      bool in_hole2 = FT_photid_FTCAL_check_hole(clusX, clusY, HOLE2.x, HOLE2.y, HOLE2.r);
+      bool in_hole3 = FT_photid_FTCAL_check_hole(clusX, clusY, HOLE3.x, HOLE3.y, HOLE3.r);
+      bool in_hole4 = FT_photid_FTCAL_check_hole(clusX, clusY, HOLE4.x, HOLE4.y, HOLE4.r);
+      bool in_hole5 = FT_photid_FTCAL_check_hole(clusX, clusY, HOLE5.x, HOLE5.y, HOLE5.r);
 
       return FIDUCIAL.lower < V3ECalPos.R() && V3ECalPos.R() < FIDUCIAL.upper && !in_hole1 && !in_hole2 && !in_hole3 &&
              !in_hole4 && !in_hole5;
     }
 
-    bool _FT_photid_beta_cut([[maybe_unused]] clas12::region_particle* _) { return true; }
+    bool FT_photid_beta_cut([[maybe_unused]] clas12::region_particle* _) { return true; }
 
   }  // namespace FT::impl
 
   namespace CD::impl {
-    bool _CD_neutr_beta_cut(clas12::region_particle* p) { return cuts::impl::_neutr_beta_cut(p); }
+    bool CD_neutr_beta_cut(clas12::region_particle* p) { return cuts::impl::neutr_beta_cut(p); }
   }  // namespace CD::impl
 
   namespace vertex::impl {
@@ -337,14 +330,14 @@ namespace cuts {
     // <particle>_delta_vz_cuts and CD_<particle>_delta_vz_cuts have different parameters but in the end
     // they are stale code and have no effect. It is just checked if the reference vertex z is between -20 and 20.
 
-    bool _delta_vz_cut(clas12::region_particle* p, double reference_vertex_z) {
+    bool delta_vz_cut(clas12::region_particle* p, double reference_vertex_z) {
       bounds tolerances{-20, 20};
       double delta_vz = reference_vertex_z - p->par()->getVz();
       return tolerances.lower < delta_vz && delta_vz < tolerances.upper;
     }
 
     // implementation for these are all shadowed by hardcoded bounds
-    bool _CD_delta_vz_cut(clas12::region_particle* p, double reference_vertex_z) {
+    bool CD_delta_vz_cut(clas12::region_particle* p, double reference_vertex_z) {
       throw not_implemented_error("[CD_delta_vz_cut] This cut is deprecated. Use idenical 'delta_vz_cut'.");
       // // p m=0.7486, s=3.237, min=-20, max=20
       // // n m=2.254, s=2.693, min=-20, max=20
@@ -378,7 +371,7 @@ namespace cuts {
   }  // namespace vertex::impl
 
   namespace impl {
-    bool _phot_beta_cut(clas12::region_particle* p, tightness tightness) {
+    bool phot_beta_cut(clas12::region_particle* p, tightness tightness) {
       using namespace cuts::parameters::beta;
 
       if (tightness != cuts::loose and tightness != cuts::medium and tightness != cuts::tight)
@@ -386,17 +379,17 @@ namespace cuts {
             "[phot_beta_cut] tightness must be cuts::tightness::loose, cuts::tightness::medium, or "
             "cuts::tightness::tight.");
 
-      return PHOT_BETA_LIMITS[tightness - 1].lower < p->par()->getBeta() &&
-             p->par()->getBeta() < PHOT_BETA_LIMITS[tightness - 1].upper && p->par()->getP() > MOMENTUM_THRESHOLD;
+      return PHOTO_BETA_LIMITS[tightness - 1].lower < p->par()->getBeta() &&
+             p->par()->getBeta() < PHOTO_BETA_LIMITS[tightness - 1].upper && p->par()->getP() > MOMENTUM_THRESHOLD;
     }
 
-    bool _neutr_beta_cut(clas12::region_particle* p) {
+    bool neutr_beta_cut(clas12::region_particle* p) {
       using namespace cuts::parameters::beta;
       // very similar to phot_beta_cut
       return NEUTR_BETA_LIMITS.lower < p->par()->getBeta() && p->par()->getBeta() < NEUTR_BETA_LIMITS.upper;
     }
 
-    bool _basic_FTOF_cut(clas12::region_particle* p) {
+    bool basic_FTOF_cut(clas12::region_particle* p) {
       return p->sci(clas12::FTOF1A)->getSector() != 0 || p->sci(clas12::FTOF1B)->getSector() != 0 ||
              p->sci(clas12::FTOF2)->getSector() != 0;  // equal to "is somewhere in FTOF?", I guess...
     }

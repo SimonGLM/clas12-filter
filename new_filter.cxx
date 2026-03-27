@@ -62,7 +62,7 @@ void new_filter() { std::cout << "Called without arguments." << std::endl; }
 void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint numEvents = 0) {
   bool verbose = false;
 
-  ROOT::DisableImplicitMT();
+  ROOT::EnableImplicitMT();
   auto c12 = std::make_unique<clas12::clas12reader>(inFile);
   c12->setVerbose();
   int events = numEvents != 0 ? numEvents : c12->getReader().getEntries();
@@ -151,8 +151,9 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", uint n
       std::string progress_bar(int(percent * 30) / 100, '=');
       progress_bar.append(">");
       progress_bar.resize(30, ' ');
-      fmt::print("{:>9d}/{:d} ({:>3.0f}%) [{:s}] {:.1f}s remaining ({:>6.0f} evts/s)\n", count, events, percent,
-                 progress_bar, time_remaining, (count - last_count) * 1. / progressInterval);
+      std::cout << std::format("{:>9d}/{:d} ({:>3.0f}%) [{:s}] {:.1f}s remaining ({:>6.0f} evts/s)\n", count, events,
+                               percent, progress_bar, time_remaining, (count - last_count) * 1. / progressInterval)
+                << std::flush;
       last_count = count;
       last_update = steady_clock::now();
     }
