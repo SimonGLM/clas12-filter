@@ -89,30 +89,27 @@ class StatisticsCollector {
     });
 
     for (const auto& [selector_name, selector_stats] : sorted_selectors) {
-      if (!selector_stats.cuts.empty()) {
-        // The selector's invocation count is tracked separately
-        int selector_invocations = selector_stats.invocations;
-        int selector_rejections = selector_stats.rejections;
-        int selector_acceptances = selector_invocations - selector_rejections;
+      int selector_invocations = selector_stats.invocations;
+      int selector_rejections = selector_stats.rejections;
+      int selector_acceptances = selector_invocations - selector_rejections;
 
-        std::cout << std::format("\033[1m{:<47} | {:>15} | {:>15} | {:>15} | {:>13.2f}%\033[0m", selector_name,
-                                 selector_invocations, selector_acceptances, selector_rejections,
-                                 selector_invocations > 0 ? selector_rejections * 1. / selector_invocations * 100 : 0)
+      std::cout << std::format("\033[1m{:<47} | {:>15} | {:>15} | {:>15} | {:>13.2f}%\033[0m", selector_name,
+                               selector_invocations, selector_acceptances, selector_rejections,
+                               selector_invocations > 0 ? selector_rejections * 1. / selector_invocations * 100 : 0)
+                << std::endl;
+
+      // Sort child cuts by invocations
+      std::vector<std::pair<std::string, CutStats>> sorted_cuts(selector_stats.cuts.begin(), selector_stats.cuts.end());
+      std::sort(sorted_cuts.begin(), sorted_cuts.end(),
+                [](const auto& a, const auto& b) { return a.second.invocations > b.second.invocations; });
+
+      for (const auto& [cut_name, stats] : sorted_cuts) {
+        std::cout << std::format("    {:<43} | {:>15} | {:>15} | {:>15} | {:>13.2f}%", cut_name, stats.getInvocations(),
+                                 stats.getAcceptance(), stats.getRejections(),
+                                 stats.getInvocations() > 0 ? stats.getRejectionRate() * 100 : 0)
                   << std::endl;
-
-        // Sort child cuts by invocations
-        std::vector<std::pair<std::string, CutStats>> sorted_cuts(selector_stats.cuts.begin(),
-                                                                  selector_stats.cuts.end());
-        std::sort(sorted_cuts.begin(), sorted_cuts.end(),
-                  [](const auto& a, const auto& b) { return a.second.invocations > b.second.invocations; });
-
-        for (const auto& [cut_name, stats] : sorted_cuts) {
-          std::cout << std::format("    {:<43} | {:>15} | {:>15} | {:>15} | {:>13.2f}%", cut_name,
-                                   stats.getInvocations(), stats.getAcceptance(), stats.getRejections(),
-                                   stats.getInvocations() > 0 ? stats.getRejectionRate() * 100 : 0)
-                    << std::endl;
-        }
       }
+      // }
     }
     std::cout << "\033[0m" << std::string(120, '=') << std::endl;
   }
