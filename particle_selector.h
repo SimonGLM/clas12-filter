@@ -27,6 +27,8 @@ namespace selectors {
         CHECK_CUT(ctx, "DC_fiducial_cut_edge_region2", cuts::FD::impl::DC_fiducial_cut_edge_reg2, p, inbending);
         CHECK_CUT(ctx, "DC_fiducial_cut_edge_region3", cuts::FD::impl::DC_fiducial_cut_edge_reg3, p, inbending);
         CHECK_CUT(ctx, "DC_z_vertex_cut", cuts::FD::impl::DC_z_vertex_cut, p, inbending);
+        // CHECK_CUT(ctx, "is_in_FD_check", []([[maybe_unused]] auto p) { return true; }, true); // just collect
+        // statistics on FD counts
       }
       if (p->getRegion() == clas12::CD && detector_flags[clas12::CD]) {
         // no cuts specified
@@ -64,6 +66,7 @@ namespace selectors {
                  double reference_vertex_z) {
       // CHECK_CUT(ctx, "PID_cut(2112)", cuts::generic::impl::PID_cut, p, 2112);
       // CHECK_CUT(ctx, "charge_cut(0)", cuts::generic::impl::charge_cut, p, 0);
+      CHECK_CUT(ctx, "momentum_cut", cuts::generic::impl::momentum_cut, p);
 
       if (p->getRegion() == clas12::FD && detector_flags[clas12::FD]) {
         CHECK_CUT(ctx, "neutr_beta_cut", cuts::impl::neutr_beta_cut, p);

@@ -13,6 +13,7 @@ namespace cuts {
       bool forward_tagger_cut(clas12::region_particle*);
       bool PID_cut(clas12::region_particle*, int pid);
       bool charge_cut(clas12::region_particle*, int charge);
+      bool momentum_cut(clas12::region_particle*);
     }  // namespace impl
 
     inline bool (*forward_detector_cut)(clas12::region_particle*) = cuts::generic::impl::forward_detector_cut;
@@ -20,6 +21,7 @@ namespace cuts {
     inline bool (*forward_tagger_cut)(clas12::region_particle*) = cuts::generic::impl::forward_tagger_cut;
     inline bool (*PID_cut)(clas12::region_particle*, int) = cuts::generic::impl::PID_cut;
     inline bool (*charge_cut)(clas12::region_particle*, int) = cuts::generic::impl::charge_cut;
+    inline bool (*momentum_cut)(clas12::region_particle*) = cuts::generic::impl::momentum_cut;
   }  // namespace generic
 
   namespace FD {

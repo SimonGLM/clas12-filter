@@ -8,6 +8,11 @@ namespace cuts::parameters {
     double lower;
     double upper;
   };
+  namespace momentum {
+    std::map<int, bounds> MOMENTUM_LIMITS = {
+        {2112, {0.05, INFINITY}},  // neutron
+    };
+  }
   namespace HTCC_nphe {
     unsigned short MIN_COUNT = 2;
   }

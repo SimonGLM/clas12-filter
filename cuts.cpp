@@ -34,6 +34,16 @@ namespace cuts {
 
     bool charge_cut(clas12::region_particle* p, int charge) { return p->par()->getCharge() == charge; }
 
+    bool momentum_cut(clas12::region_particle* p) {
+      using namespace cuts::parameters::momentum;
+      double P = p->par()->getP();
+      int pdg = std::abs(p->par()->getPid());
+      if (MOMENTUM_LIMITS.find(pdg) == MOMENTUM_LIMITS.end()) {
+        // if pdg not in limits, return true (i.e. no cut)
+        return true;
+      }
+      return MOMENTUM_LIMITS.at(pdg).lower < P && P < MOMENTUM_LIMITS.at(pdg).upper;
+    }
 
     // bool vertex_cut(clas12::region_particle* p, int runnum) {
     //   // from tbhayward/clas12_analysis_software
