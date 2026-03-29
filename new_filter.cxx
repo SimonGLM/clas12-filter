@@ -268,49 +268,49 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", bool i
         // --------------------------- 3.1 ---------------------------
         // // ====================== PARTICLE CUTS ======================
         // check cuts with selector functions, if fail: remove from the event
-        if (pdg == 11 && !selectors::electron(p, inbending, tightness)) {
+        if (pdg == 11 && !selectors::electron(p, inbending)) {
           particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
                                     particlesByPDG[pdg].end());
           if (verbose) std::cout << "Rejected electron" << std::endl;
           continue;
         }
-        if (pdg == 2212 && !selectors::proton(p, inbending, tightness, reference_vertex)) {
+        if (pdg == 2212 && !selectors::proton(p, inbending, reference_vertex)) {
           particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
                                     particlesByPDG[pdg].end());
           if (verbose) std::cout << "Rejected proton" << std::endl;
           continue;
         }
-        if (pdg == 2112 && !selectors::neutron(p, inbending, tightness, reference_vertex)) {
+        if (pdg == 2112 && !selectors::neutron(p, inbending, reference_vertex)) {
           particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
                                     particlesByPDG[pdg].end());
           if (verbose) std::cout << "Rejected neutron" << std::endl;
           continue;
         }
-        if (pdg == 211 && !selectors::piplus(p, inbending, tightness, reference_vertex)) {
+        if (pdg == 211 && !selectors::piplus(p, inbending, reference_vertex)) {
           particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
                                     particlesByPDG[pdg].end());
           if (verbose) std::cout << "Rejected piplus" << std::endl;
           continue;
         }
-        if (pdg == -211 && !selectors::piminus(p, inbending, tightness, reference_vertex)) {
+        if (pdg == -211 && !selectors::piminus(p, inbending, reference_vertex)) {
           particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
                                     particlesByPDG[pdg].end());
           if (verbose) std::cout << "Rejected piminus" << std::endl;
           continue;
         }
-        if (pdg == 321 && !selectors::Kplus(p, inbending, tightness, reference_vertex)) {
+        if (pdg == 321 && !selectors::Kplus(p, inbending, reference_vertex)) {
           particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
                                     particlesByPDG[pdg].end());
           if (verbose) std::cout << "Rejected Kplus" << std::endl;
           continue;
         }
-        if (pdg == -321 && !selectors::Kminus(p, inbending, tightness, reference_vertex)) {
+        if (pdg == -321 && !selectors::Kminus(p, inbending, reference_vertex)) {
           particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
                                     particlesByPDG[pdg].end());
           if (verbose) std::cout << "Rejected Kminus" << std::endl;
           continue;
         }
-        if (pdg == 22 && !selectors::photon(p, inbending, tightness, reference_vertex)) {
+        if (pdg == 22 && !selectors::photon(p, inbending)) {
           particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
                                     particlesByPDG[pdg].end());
           if (verbose) std::cout << "Rejected photon" << std::endl;
