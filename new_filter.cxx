@@ -45,8 +45,8 @@ using region_part_ptr = clas12::region_particle*;  // needed for compilation
 #include "cuts.h"
 #include "dynamicvarstore.h"
 #include "helpers.h"
-#include "particle_context.h"
-#include "particle_selector.h"
+#include "selector.h"
+#include "selector_context.h"
 #include "statistics_collector.h"
 
 // Include cuts implementation for ACLiC

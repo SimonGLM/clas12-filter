@@ -11,7 +11,7 @@ struct CutResult {
   bool passed;
 };
 
-class ParticleContext {
+class SelectorContext {
  private:
   EvaluationMode mode;
   std::vector<CutResult> cut_history;
@@ -19,7 +19,7 @@ class ParticleContext {
   bool any_failed = false;
 
  public:
-  ParticleContext(EvaluationMode mode = EvaluationMode::EarlyReturn) : mode(mode) {}
+  SelectorContext(EvaluationMode mode = EvaluationMode::EarlyReturn) : mode(mode) {}
 
   template <typename Func, typename... Args>
   bool apply_cut(const std::string& cut_name, Func&& cut_func, Args&&... args) {
