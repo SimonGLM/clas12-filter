@@ -65,8 +65,7 @@ void new_filter() {
 }
 //////////////////////////////////////////////////////////////////////////////
 
-void new_filter(std::string inFile, std::string outputfile = "/dev/null", int runnum = 5043, bool inbending = false,
-                uint numEvents = 0) {
+void new_filter(std::string inFile, std::string outputfile = "/dev/null", bool isInbending = true, uint numEvents = 0) {
   bool verbose = false;
 
   ROOT::EnableImplicitMT();
@@ -76,13 +75,25 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", int ru
 
   // General conditions
   if (verbose) std::cout << "[C12] Setting up general run conditions..." << std::endl;
+  // for some reasons the readQuickRunConfig reads the config and only gets the runnum
+  int runnum = clas12::clas12reader::readQuickRunConfig(inFile);
+  // but we also need the torus polarity, but c12->runconfig()->getTorus() segfaults
+  bool inbending = isInbending;
+
+  // arbitrary sequence to process particles in
+  // this eases comparison of print statistics and ensures that we always
+  // process electrons first (important for reference vertex)
   const std::vector<int> particle_sequence = {11, 2212, 2112, 211, -211, 321, -321, 22};
+
+  // default tightness, overridden in selectors for some cuts <= this may change
   cuts::tightness tightness = cuts::tightness::loose;
 
   // specify evaluation mode for selectors
   // EarlyReturn: Immediatly return on rejected cut,
   // CompleteTrace: check ALL cuts, then return
   selectors::evaluation_mode = EvaluationMode::CompleteTrace;
+
+  // flags to in/exclude detectors during selectors
   selectors::detector_flags[clas12::FT] = false;  // ignored for photons
   selectors::detector_flags[clas12::FD] = true;
   selectors::detector_flags[clas12::CD] = true;
@@ -122,7 +133,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", int ru
   vars.AddField<int>("helicity");
   vars.AddField<float>("beam_charge");
 
-  // The following lists determine the particles of interest for each group of fields
+  // The following lists in the arguments determine the particles of interest for each group of fields
   // later they will come from a config file
   vars.AddMomentaFieldsPerParticle({11, 2212, 2112, 211, -211, 321, -321});
   vars.AddDetectorFieldsPerParticle({11, 22, 2212, 2112, 211, -211, 321, -321});
@@ -131,7 +142,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", int ru
   vars.AddDCFields();
 
   // Create Writer that takes ownership of the model
-  std::string tempfile = "/tmp/rntuple.root";
+  std::string tempfile = "/tmp/clas12_filter_intermediate_rntuple.root";
   if (verbose) std::cout << "[RNTuple] Creating RNTuple writer from model..." << std::endl;
   auto file = ROOT::RNTupleWriter::Recreate(std::move(vars.Model()), "nTupleName", tempfile);
 
@@ -162,6 +173,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", int ru
     }
     count++;
 
+    // Event properties.
     vars.SetValue("eventnumber", c12->runconfig()->getEvent());
     vars.SetValue("helicity", c12->event()->getHelicity());
     vars.SetValue("beam_charge", c12->event()->getBeamCharge());
@@ -180,7 +192,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", int ru
     // ======================= WORK FLOW ========================
     //  1. Store particles in map to process in required order later
     //     1.1 If no electrons, skip event
-    //  2. Loop over this map in particular particle order (e-, p, n, pi+, pi-, K+, K-)
+    //  2. Loop over this map in particular particle order (e-, p, n, pi+, pi-, K+, K-, photons)
     //     2.1 Break loop and reject event if no valid electrons remain
     //     2.2 Sort particles of this type by momentum
     //     2.3 If reference vertex not set, set it to highest momentum electron
@@ -221,24 +233,24 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", int ru
     for (int pdg : particle_sequence) {
       // skip early if there are no particles of this pdg in the event
       if (particlesByPDG[pdg].empty()) {
-        // if (verbose) std::cout << "No " << pdg_name(pdg) << " in event. Skipping particle..." << std::endl;
+        // if (verbose) std::cout << "No " << pdg_name(pdg) << " in event. Skipping ..." << std::endl;
         continue;
       }
 
       // --------------------------- 2.1 ---------------------------
-      // after we processed electrons (pdg!=11), do we have electrons left? No? Reject event.
-      if (pdg != 11 && particlesByPDG[11].empty()) {
-        if (verbose) std::cout << "No valid electrons in event. Rejecting event..." << std::endl;
-        break;
-      }
-
-      // --------------------------- 2.2 ---------------------------
       // sort particles by momentum for each PDG code (if there are more than one particles to sort)
       if (particlesByPDG[pdg].size() > 1) {
         if (verbose)
           std::cout << "Sorting particles: " << pdg_name(pdg) << " " << particlesByPDG[pdg].size() << std::endl;
         std::sort(std::begin(particlesByPDG[pdg]), std::end(particlesByPDG[pdg]),
                   [](clas12::region_part_ptr a, clas12::region_part_ptr b) { return a->getP() > b->getP(); });
+      }
+
+      // --------------------------- 2.2 ---------------------------
+      // after we processed electrons (pdg!=11), do we have electrons left? No? Reject event.
+      if (pdg != 11 && particlesByPDG[11].empty()) {
+        if (verbose) std::cout << "No valid electrons in event. Rejecting event..." << std::endl;
+        break;
       }
 
       // --------------------------- 2.3 ---------------------------
@@ -253,12 +265,6 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", int ru
       // ========================== 3. ==========================
       // loop particles of this type
       for (auto&& p : particlesByPDG[pdg]) {
-        std::string name = pdg_name(p->getPid());
-        if (name == "unknown") {
-          // std::cout << "Unknown particle with PDG code " << p->getPid() << " found, skipping..." << std::endl;
-          continue;
-        }
-
         // --------------------------- 3.1 ---------------------------
         // // ====================== PARTICLE CUTS ======================
         // check cuts with selector functions, if fail: remove from the event
@@ -311,6 +317,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", int ru
           continue;
         }
 
+        std::string name = pdg_name(p->getPid());
         if (verbose) std::cout << std::format("Valid {} found!", name) << std::endl;
 
         // --------------------------- 3.2 ---------------------------
@@ -335,7 +342,9 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", int ru
           // Old way used  1000<=abs(part_status)<2000 => FT: ele_det=1
           //               2000<=abs(part_Status)<4000 => FD: ele_det=2
           //               4000<=abs(part_Status)      => CD: ele_det=3
-          // no idea if this is correct
+          // There might be a mismatch to clas12::FD (et.al.) constants, where clas12::CD=3000...
+          // Keep the status check (instead of checking p->getRegion() against clas12 constants), and keep this mismatch
+          // in mind.
           int status = std::abs(p->getStatus());
           int val = status >= 1000 && status < 2000 ? 1 : status >= 2000 && status < 4000 ? 2 : status >= 4000 ? 3 : -1;
           vars.AppendValue(name + "_det", val);

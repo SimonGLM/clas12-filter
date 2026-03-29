@@ -10,7 +10,7 @@ const std::string pdg_name(const int& pdg) {
          : pdg == -211 ? "pim"
          : pdg == 321  ? "Kp"
          : pdg == -321 ? "Km"
-                       : std::format("pdg: {}", pdg);
+                       : std::format("pdg({})", pdg);
 };
 
 class not_implemented_error : public std::logic_error {

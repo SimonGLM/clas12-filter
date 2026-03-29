@@ -39,7 +39,7 @@ class DynamicVarStore {
   // Each entry stores a shared_ptr<T> of one of the supported types
   using variant_type = std::variant<std::shared_ptr<int>, std::shared_ptr<float>, std::shared_ptr<double>,
                                     std::shared_ptr<std::vector<int>>, std::shared_ptr<std::vector<float>>,
-                                    std::shared_ptr<std::vector<double>>>;
+                                    std::shared_ptr<std::vector<double>>>;  // add more vector types here if needed
   using variant_map = std::unordered_map<std::string, variant_type>;
 
   variant_map fMap;
@@ -85,10 +85,10 @@ void DynamicVarStore::AppendValue(const std::string& name, const T& value) {
       [&](auto&& arg) {
         using U = std::decay_t<decltype(arg)>;
         if constexpr (!std::is_same_v<U, std::shared_ptr<std::vector<T>>>) {
-#if __GNUG__
+#if __GNUG__  // try to get sensible type names (only GLib)
           throw std::invalid_argument(std::format("Type missmatch between field '{}' and value of type '{}'", name,
                                                   abi::__cxa_demangle(typeid(arg).name(), NULL, NULL, nullptr)));
-#else
+#else  // fall back to not providing a demangled type name
           throw std::invalid_argument(std::format("Type missmatch between field '{}' and value type", name));
 #endif
         } else {
@@ -107,7 +107,9 @@ void DynamicVarStore::ResetVectorFields() {
         [&](auto&& arg) {
           using U = std::decay_t<decltype(arg)>;
           if constexpr (std::is_same_v<U, std::shared_ptr<std::vector<int>>> ||
-                        std::is_same_v<U, std::shared_ptr<std::vector<double>>>) {
+                        std::is_same_v<U, std::shared_ptr<std::vector<double>>>)  // also add more vector types here if
+                                                                                  // needed
+          {
             arg->clear();
           }
         },
