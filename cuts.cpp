@@ -30,6 +30,11 @@ namespace cuts {
       return (1000 <= det && det < 2000);
     }
 
+    bool basic_FTOF_cut(clas12::region_particle* p) {
+      return p->sci(clas12::FTOF1A)->getSector() != 0 || p->sci(clas12::FTOF1B)->getSector() != 0 ||
+             p->sci(clas12::FTOF2)->getSector() != 0;  // equal to "is somewhere in FTOF?", I guess...
+    }
+
     bool PID_cut(clas12::region_particle* p, int pid) { return p->par()->getPid() == pid; }
 
     bool charge_cut(clas12::region_particle* p, int charge) { return p->par()->getCharge() == charge; }
@@ -44,55 +49,6 @@ namespace cuts {
       }
       return MOMENTUM_LIMITS.at(pdg).lower < P && P < MOMENTUM_LIMITS.at(pdg).upper;
     }
-
-    // bool vertex_cut(clas12::region_particle* p, int runnum) {
-    //   // from tbhayward/clas12_analysis_software
-    //   int charge = p->par()->getCharge();
-    //   float vz = p->par()->getVz();
-    //
-    //   //                          pos     neg   charge
-    //   using bounds_pair = std::pair<bounds, bounds>;
-    //   bounds_pair bounds_spring18_inb = {{-7.879, 1.515}, {-6.0606, 1.8182}};
-    //   bounds_pair bounds_spring18_outb = {{-6.6667, 2.7273}, {-7.273, 0.9091}};
-    //   bounds_pair bounds_fall18_inb = {{-8.485, 0.606}, {-6.364, 1.515}};
-    //   bounds_pair bounds_fall18_outb = {{-6.970, 1.818}, {-7.879, 0.303}};
-    //   bounds_pair bounds_spring19_inb = bounds_fall18_inb;
-    //   bounds_pair bounds_summer22 = {{-9.394, -0.606}, {-7.576, 0.303}};
-    //   bounds_pair bounds_fall22_spring23 = {{-8.788, 0.303}, {-5.758, 1.515}};
-    //   bounds fallback = {-9, 2};
-    //
-    //   bounds_pair vz_bounds_pair;
-    //   if (runnum == 11) {
-    //     vz_bounds_pair = {{-10, 1.5}, {-9, 2}};
-    //   } else if ((runnum >= 3173 && runnum >= 3293) || (runnum >= 3863 && runnum <= 3987))  // spring18 outb
-    //   {
-    //     vz_bounds_pair = bounds_spring18_outb;
-    //   } else if (runnum >= 4003 && runnum <= 4325)  // spring18 inb
-    //   {
-    //     vz_bounds_pair = bounds_spring18_inb;
-    //   } else if (runnum >= 5032 && runnum <= 5419)  // fall18 inbending
-    //   {
-    //     vz_bounds_pair = bounds_fall18_inb;
-    //   } else if (runnum >= 5422 && runnum <= 5666)  // fall18 outbending
-    //   {
-    //     vz_bounds_pair = bounds_fall18_outb;
-    //   } else if (runnum >= 6616 && runnum <= 6783)  // spring19 inbending
-    //   {
-    //     vz_bounds_pair = bounds_spring19_inb;
-    //   } else if (runnum >= 16043 && runnum <= 16772)  // su22
-    //   {
-    //     vz_bounds_pair = bounds_summer22;
-    //   } else if (runnum >= 16843 && runnum <= 17811)  // fa22 & sp32
-    //   {
-    //     vz_bounds_pair = bounds_fall22_spring23;
-    //   }
-    //
-    //   bounds vz_bounds = charge > 0   ? vz_bounds_pair.first
-    //                      : charge < 0 ? vz_bounds_pair.second
-    //                                   : fallback;  // choose from charge or fallback for neutral
-    //
-    //   return vz_bounds.lower < vz && vz < vz_bounds.upper;
-    // }
   }  // namespace generic::impl
 
   namespace FD::impl {
@@ -103,7 +59,7 @@ namespace cuts {
       return MIN_COUNT < p->che(clas12::HTCC)->getNphe();
     }
 
-    // TODO: move boolean arguments to infering from region_particle
+    // TODO: infering boolean arguments from region_particle
     bool EC_sampling_fraction_cut(clas12::region_particle* p, bool inbending = false, bool simulation = false,
                                   bool spring19 = false) {
       // original EC_sampling_fraction_cut
@@ -367,13 +323,6 @@ namespace cuts {
     // implementation for these are all shadowed by hardcoded bounds
     bool CD_delta_vz_cut(clas12::region_particle* p, double reference_vertex_z) {
       throw not_implemented_error("[CD_delta_vz_cut] This cut is deprecated. Use idenical 'delta_vz_cut'.");
-      // // p m=0.7486, s=3.237, min=-20, max=20
-      // // n m=2.254, s=2.693, min=-20, max=20
-      // // Pp m=-0.6183, s=3.684, min=-20, max=20
-      // // Pm m=-0.5485, s=3.677, min=-20, max=20
-      // // Kp m=1.658, s=2.52, min=-20, max=20
-      // // Km m=-1.161, s=2.691, min=-20, max=20
-
       // struct ParamMeanStd {
       //   double mean;
       //   double sigma;
@@ -391,9 +340,7 @@ namespace cuts {
       // [[maybe_unsued]] double dvz_max = mean + 3 * sigma;
       // [[maybe_unsued]] bounds dvz_bounds = {dvz_min, dvz_max};
 
-      // // double delta_vz = p->par()->getVz(); // Is this the proper reference vertex?
-
-      // bounds tolerances{-20, 20};
+      // bounds tolerances{-20, 20}; // shadows previous bound calculation, making this cut identical to delta_vz_cut
       // return tolerances.lower < reference_vertex_z && reference_vertex_z < tolerances.upper;
     }
   }  // namespace vertex::impl
@@ -417,9 +364,5 @@ namespace cuts {
       return NEUTR_BETA_LIMITS.lower < p->par()->getBeta() && p->par()->getBeta() < NEUTR_BETA_LIMITS.upper;
     }
 
-    bool basic_FTOF_cut(clas12::region_particle* p) {
-      return p->sci(clas12::FTOF1A)->getSector() != 0 || p->sci(clas12::FTOF1B)->getSector() != 0 ||
-             p->sci(clas12::FTOF2)->getSector() != 0;  // equal to "is somewhere in FTOF?", I guess...
-    }
   }  // namespace impl
 }  // namespace cuts

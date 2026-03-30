@@ -413,14 +413,15 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", bool i
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    std::cout << "Usage: new_filter <input_file> [output_file] [num_events]" << std::endl;
+    std::cout << "Usage: new_filter <input_file> [output_file] [isInbending] [num_events]" << std::endl;
     return 1;
   }
 
   std::string input_file = argv[1];
   std::string output_file = (argc >= 3) ? argv[2] : "output.root";
-  uint num_events = (argc >= 4) ? std::stoi(argv[3]) : 0;
+  bool isInbending = (argc >= 4) ? bool(argv[3]) : true;
+  uint num_events = (argc >= 5) ? std::stoi(argv[4]) : 0;
 
-  new_filter(input_file, output_file, num_events);
+  new_filter(input_file, output_file, isInbending, num_events);
   return 0;
 }
