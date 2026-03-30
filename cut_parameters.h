@@ -9,12 +9,12 @@ namespace cuts::parameters {
     double upper;
   };
   namespace momentum {
-    std::map<int, bounds> MOMENTUM_LIMITS = {
+    const std::map<int, bounds> MOMENTUM_LIMITS = {
         {2112, {0.05, INFINITY}},  // neutron
     };
   }
   namespace HTCC_nphe {
-    unsigned short MIN_COUNT = 2;
+    const unsigned short MIN_COUNT = 2;
   }
   namespace EC_sampling_fraction {
     namespace band {
@@ -30,7 +30,7 @@ namespace cuts::parameters {
         BandParameters p3;
       };
 
-      BandParameterLUT FALL18_INB = {
+      const BandParameterLUT FALL18_INB = {
           .p0 = {.mean = {0.111767, 0.116619, 0.114606, 0.116586, 0.118251, 0.117391},
                  .sigma = {-0.00497609, 0.0259435, 0.0296159, 0.0161445, 0.0239166, 0.0244309}},
           .p1 = {.mean = {-0.0281943, 0.0662751, -0.0896597, 0.181465, 0.085993, 0.0186504},
@@ -41,7 +41,7 @@ namespace cuts::parameters {
                  .sigma = {-0.000173549, 0.00030325, 0.000380195, 0.00012328, 0.000302528, 0.000340911}}};
 
       // fall2018 outb:
-      BandParameterLUT FALL18_OUTB = {
+      const BandParameterLUT FALL18_OUTB = {
           .p0 = {.mean = {0.111919, 0.11244, 0.11457, 0.124517, 0.109132, 0.115026},
                  .sigma = {-0.000828514, 0.019356, 0.023144, -0.000468566, 0.00500942, -0.00167471}},
           .p1 = {.mean = {-0.00764253, 0.156704, 0.246338, 0.880436, -0.181137, 0.335205},
@@ -52,7 +52,7 @@ namespace cuts::parameters {
                  .sigma = {-6.99914e-05, 0.000152666, 0.000164229, -0.000133009, -3.68797e-05,
                            -0.000107538}}};  // namespace band
       //   // spring2019:
-      BandParameterLUT SPRING19 = {
+      const BandParameterLUT SPRING19 = {
           .p0 = {.mean = {0.11253, 0.113735, 0.112401, 0.115128, 0.113048, 0.1147},
                  .sigma = {0.0193473, 0.0351352, 0.0234448, 0.0238342, 0.0382829, 0.0125166}},
           .p1 = {.mean = {-0.0689836, -0.044216, -0.160555, 0.108512, -0.153003, -0.0997027},
@@ -63,7 +63,7 @@ namespace cuts::parameters {
                  .sigma = {0.000165603, 0.000440174, 0.000274543, 0.000260158, 0.000508396, 0.000206116}}};
 
       //   // MC inb:
-      BandParameterLUT SIMULATION_INB = {
+      const BandParameterLUT SIMULATION_INB = {
           .p0 = {.mean = {0.118444, 0.118383, 0.118318, 0.118531, 0.117475, 0.119179},
                  .sigma = {0.0204537, 0.0242836, 0.0320663, 0.0171258, 0.0236728, 0.0157762}},
           .p1 = {.mean = {-0.0445042, -0.0326496, 0.00402908, 0.0384926, -0.0768068, 0.0045002},
@@ -74,7 +74,7 @@ namespace cuts::parameters {
                  .sigma = {0.000232288, 0.000277151, 0.000425544, 0.00018372, 0.000290388, 0.000160679}}};
 
       //   // MC outb:
-      BandParameterLUT SIMULATION_OUTB = {
+      const BandParameterLUT SIMULATION_OUTB = {
           .p0 = {.mean = {0.124075, 0.124086, 0.124071, 0.125947, 0.120091, 0.124457},
                  .sigma = {0.00231891, 0.000686535, 0.000327404, -0.000165373, 0.00376051, 0.000856615}},
           .p1 = {.mean = {0.259169, 0.257774, 0.286948, 0.449492, -0.0180208, 0.274625},
@@ -201,7 +201,7 @@ namespace cuts::parameters {
     }  // namespace threshold
 
     // phot_EC_sampling_fraction cut parameters:
-    bounds PHOT_SF_LIMITS = {0., 1.};
+    const bounds PHOT_SF_LIMITS = {0., 1.};
   }  // namespace EC_sampling_fraction
   namespace PCAL_fiducial {
 
@@ -335,7 +335,7 @@ namespace cuts::parameters {
 
   }  // namespace PCAL_fiducial
   namespace EC_outer_vs_EC_inner {
-    std::array<double, 3> MIN_EDEP = {0.06, 0.07, 0.09};
+    const std::array<double, 3> MIN_EDEP = {0.06, 0.07, 0.09};
     // phot_EC_outer_vs_EC_inner cut parameters:
     double PHOT_MIN_EDEP = 0.01;
   }  // namespace EC_outer_vs_EC_inner
@@ -350,32 +350,33 @@ namespace cuts::parameters {
         {321, {{2.5, 2.0, 9.0}, {3.5, 2.5, 6.5}}},  {-321, {{3.5, 2.5, 5.0}, {2.5, 2.5, 10.0}}}};
 
   }  // namespace DC_fiducial
-  namespace DC_z_vertex {
-    std::array<bounds, 6> LIMITS_INB = {{{-8, 2}, {-8, 2}, {-8, 2}, {-8, 2}, {-8, 2}, {-8, 2}}};
-    std::array<bounds, 6> LIMITS_OUTB = {{{-11, 1}, {-11, 1}, {-11, 1}, {-11, 1}, {-11, 1}, {-11, 1}}};
-  }  // namespace DC_z_vertex
+  namespace vertex {
+    const bounds VERTEX_DELTA{-20, 20};
+    const std::array<bounds, 6> VERTEX_LIMITS_INB = {{{-8, 2}, {-8, 2}, {-8, 2}, {-8, 2}, {-8, 2}, {-8, 2}}};
+    const std::array<bounds, 6> VERTEX_LIMITS_OUTB = {{{-11, 1}, {-11, 1}, {-11, 1}, {-11, 1}, {-11, 1}, {-11, 1}}};
+  }  // namespace vertex
   namespace FT_fiducial {
-    bounds THETA_LIMITS = {2.5, 4.5};
+    const bounds THETA_LIMITS = {2.5, 4.5};
   }
   namespace FT_photid_FTCAL_fiducial {
-    bounds FIDUCIAL = {8, 15};
+    const bounds FIDUCIAL = {8, 15};
     struct hole {
       double x, y, r;
     };
-    hole HOLE1{-8.5, +10, 1.5};
-    hole HOLE2{-10, -5, 1.5};
-    hole HOLE3{-6, -13.5, 2.};
-    hole HOLE4{+4, -6.7, 1.5};
-    hole HOLE5{+6, -6, 1.};
+    const hole HOLE1{-8.5, +10, 1.5};
+    const hole HOLE2{-10, -5, 1.5};
+    const hole HOLE3{-6, -13.5, 2.};
+    const hole HOLE4{+4, -6.7, 1.5};
+    const hole HOLE5{+6, -6, 1.};
 
   }  // namespace FT_photid_FTCAL_fiducial
   namespace beta {
     // neutr_beta cut parameters:
-    bounds NEUTR_BETA_LIMITS = {0., 0.95};
+    const bounds NEUTR_BETA_LIMITS = {0., 0.95};
 
     // phot_beta cut parameters:
-    double MOMENTUM_THRESHOLD = 0.10;
-    std::array<bounds, 3> PHOTO_BETA_LIMITS = {{
+    const double MOMENTUM_THRESHOLD = 0.10;
+    const std::array<bounds, 3> PHOTO_BETA_LIMITS = {{
         {0.9, 2.0},   // loose
         {0.9, 1.1},   // medium
         {0.95, 1.05}  // tight

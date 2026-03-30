@@ -270,15 +270,17 @@ namespace cuts {
     }
 
     bool DC_z_vertex_cut(clas12::region_particle* p, bool inbending) {
-      using namespace cuts::parameters::DC_z_vertex;
+      using namespace cuts::parameters::vertex;
       int sector = p->cal(clas12::PCAL)->getSector();
       if (sector == 0) return false;  // exit early if no sector assigned
       sector--;                       // convert to 0-index for LUT access
 
       if (inbending) {
-        return LIMITS_INB[sector].lower < p->par()->getVz() && p->par()->getVz() < LIMITS_INB[sector].upper;
+        return VERTEX_LIMITS_INB[sector].lower < p->par()->getVz() &&
+               p->par()->getVz() < VERTEX_LIMITS_INB[sector].upper;
       } else {
-        return LIMITS_OUTB[sector].lower < p->par()->getVz() && p->par()->getVz() < LIMITS_OUTB[sector].upper;
+        return VERTEX_LIMITS_OUTB[sector].lower < p->par()->getVz() &&
+               p->par()->getVz() < VERTEX_LIMITS_OUTB[sector].upper;
       }
     }
 
@@ -342,6 +344,7 @@ namespace cuts {
   }  // namespace FT::impl
 
   namespace CD::impl {
+    // provide alternative name to identical cut
     bool CD_neutr_beta_cut(clas12::region_particle* p) { return cuts::impl::neutr_beta_cut(p); }
   }  // namespace CD::impl
 
@@ -356,9 +359,9 @@ namespace cuts {
     // they are stale code and have no effect. It is just checked if the reference vertex z is between -20 and 20.
 
     bool delta_vz_cut(clas12::region_particle* p, double reference_vertex_z) {
-      bounds tolerances{-20, 20};
+      using namespace cuts::parameters::vertex;
       double delta_vz = reference_vertex_z - p->par()->getVz();
-      return tolerances.lower < delta_vz && delta_vz < tolerances.upper;
+      return VERTEX_DELTA.lower < delta_vz && delta_vz < VERTEX_DELTA.upper;
     }
 
     // implementation for these are all shadowed by hardcoded bounds
