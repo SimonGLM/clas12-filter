@@ -264,59 +264,59 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", bool i
         if (verbose) std::cout << reference_vertex << std::endl;
       }
 
+      // --------------------------- 3.1 ---------------------------
+      // // ====================== PARTICLE CUTS ======================
+      // check cuts with selector functions, for all particles first
+      if (pdg == 11) {
+        particlesByPDG[pdg].erase(std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
+                                                 [&](auto&& p) { return !selectors::electron(p, inbending); }),
+                                  particlesByPDG[pdg].end());
+      }
+      if (pdg == 2212) {
+        particlesByPDG[pdg].erase(
+            std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
+                           [&](auto&& p) { return !selectors::proton(p, inbending, reference_vertex); }),
+            particlesByPDG[pdg].end());
+      }
+      if (pdg == 2112) {
+        particlesByPDG[pdg].erase(
+            std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
+                           [&](auto&& p) { return !selectors::neutron(p, inbending, reference_vertex); }),
+            particlesByPDG[pdg].end());
+      }
+      if (pdg == 211) {
+        particlesByPDG[pdg].erase(
+            std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
+                           [&](auto&& p) { return !selectors::piplus(p, inbending, reference_vertex); }),
+            particlesByPDG[pdg].end());
+      }
+      if (pdg == -211) {
+        particlesByPDG[pdg].erase(
+            std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
+                           [&](auto&& p) { return !selectors::piminus(p, inbending, reference_vertex); }),
+            particlesByPDG[pdg].end());
+      }
+      if (pdg == 321) {
+        particlesByPDG[pdg].erase(
+            std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
+                           [&](auto&& p) { return !selectors::Kplus(p, inbending, reference_vertex); }),
+            particlesByPDG[pdg].end());
+      }
+      if (pdg == -321) {
+        particlesByPDG[pdg].erase(
+            std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
+                           [&](auto&& p) { return !selectors::Kminus(p, inbending, reference_vertex); }),
+            particlesByPDG[pdg].end());
+      }
+      if (pdg == 22) {
+        particlesByPDG[pdg].erase(std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
+                                                 [&](auto&& p) { return !selectors::photon(p, inbending); }),
+                                  particlesByPDG[pdg].end());
+      }
+
       // ========================== 3. ==========================
       // loop particles of this type
       for (auto&& p : particlesByPDG[pdg]) {
-        // --------------------------- 3.1 ---------------------------
-        // // ====================== PARTICLE CUTS ======================
-        // check cuts with selector functions, for all particles first
-        if (pdg == 11) {
-          particlesByPDG[pdg].erase(std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
-                                                   [&](auto&& p) { return !selectors::electron(p, inbending); }),
-                                    particlesByPDG[pdg].end());
-        }
-        if (pdg == 2212) {
-          particlesByPDG[pdg].erase(
-              std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
-                             [&](auto&& p) { return !selectors::proton(p, inbending, reference_vertex); }),
-              particlesByPDG[pdg].end());
-        }
-        if (pdg == 2112) {
-          particlesByPDG[pdg].erase(
-              std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
-                             [&](auto&& p) { return !selectors::neutron(p, inbending, reference_vertex); }),
-              particlesByPDG[pdg].end());
-        }
-        if (pdg == 211) {
-          particlesByPDG[pdg].erase(
-              std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
-                             [&](auto&& p) { return !selectors::piplus(p, inbending, reference_vertex); }),
-              particlesByPDG[pdg].end());
-        }
-        if (pdg == -211) {
-          particlesByPDG[pdg].erase(
-              std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
-                             [&](auto&& p) { return !selectors::piminus(p, inbending, reference_vertex); }),
-              particlesByPDG[pdg].end());
-        }
-        if (pdg == 321) {
-          particlesByPDG[pdg].erase(
-              std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
-                             [&](auto&& p) { return !selectors::Kplus(p, inbending, reference_vertex); }),
-              particlesByPDG[pdg].end());
-        }
-        if (pdg == -321) {
-          particlesByPDG[pdg].erase(
-              std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
-                             [&](auto&& p) { return !selectors::Kminus(p, inbending, reference_vertex); }),
-              particlesByPDG[pdg].end());
-        }
-        if (pdg == 22) {
-          particlesByPDG[pdg].erase(std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
-                                                   [&](auto&& p) { return !selectors::photon(p, inbending); }),
-                                    particlesByPDG[pdg].end());
-        }
-
         std::string name = pdg_name(p->getPid());
         if (verbose) std::cout << std::format("Valid {} found!", name) << std::endl;
         particle_count++;
