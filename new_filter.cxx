@@ -256,7 +256,8 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", bool i
       // --------------------------- 2.3 ---------------------------
       if (pdg != 11 && std::isnan(reference_vertex)) {
         // set reference_vertex to highest momentum electron
-        // this is only done once, after all electrons have been processed
+        // this is only done once, after all electrons have been processed,
+        // and thus are only valid electrons
         if (verbose) std::cout << "Reference Vertex: " << std::flush;
         reference_vertex = particlesByPDG[11].at(0)->par()->getVz();
         if (verbose) std::cout << reference_vertex << std::endl;
@@ -267,54 +268,52 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", bool i
       for (auto&& p : particlesByPDG[pdg]) {
         // --------------------------- 3.1 ---------------------------
         // // ====================== PARTICLE CUTS ======================
-        // check cuts with selector functions, if fail: remove from the event
-        if (pdg == 11 && !selectors::electron(p, inbending)) {
-          particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
+        // check cuts with selector functions, for all particles first
+        if (pdg == 11) {
+          particlesByPDG[pdg].erase(std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
+                                                   [&](auto&& p) { return !selectors::electron(p, inbending); }),
                                     particlesByPDG[pdg].end());
-          if (verbose) std::cout << "Rejected electron" << std::endl;
-          continue;
         }
-        if (pdg == 2212 && !selectors::proton(p, inbending, reference_vertex)) {
-          particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
-                                    particlesByPDG[pdg].end());
-          if (verbose) std::cout << "Rejected proton" << std::endl;
-          continue;
+        if (pdg == 2212) {
+          particlesByPDG[pdg].erase(
+              std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
+                             [&](auto&& p) { return !selectors::proton(p, inbending, reference_vertex); }),
+              particlesByPDG[pdg].end());
         }
-        if (pdg == 2112 && !selectors::neutron(p, inbending, reference_vertex)) {
-          particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
-                                    particlesByPDG[pdg].end());
-          if (verbose) std::cout << "Rejected neutron" << std::endl;
-          continue;
+        if (pdg == 2112) {
+          particlesByPDG[pdg].erase(
+              std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
+                             [&](auto&& p) { return !selectors::neutron(p, inbending, reference_vertex); }),
+              particlesByPDG[pdg].end());
         }
-        if (pdg == 211 && !selectors::piplus(p, inbending, reference_vertex)) {
-          particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
-                                    particlesByPDG[pdg].end());
-          if (verbose) std::cout << "Rejected piplus" << std::endl;
-          continue;
+        if (pdg == 211) {
+          particlesByPDG[pdg].erase(
+              std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
+                             [&](auto&& p) { return !selectors::piplus(p, inbending, reference_vertex); }),
+              particlesByPDG[pdg].end());
         }
-        if (pdg == -211 && !selectors::piminus(p, inbending, reference_vertex)) {
-          particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
-                                    particlesByPDG[pdg].end());
-          if (verbose) std::cout << "Rejected piminus" << std::endl;
-          continue;
+        if (pdg == -211) {
+          particlesByPDG[pdg].erase(
+              std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
+                             [&](auto&& p) { return !selectors::piminus(p, inbending, reference_vertex); }),
+              particlesByPDG[pdg].end());
         }
-        if (pdg == 321 && !selectors::Kplus(p, inbending, reference_vertex)) {
-          particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
-                                    particlesByPDG[pdg].end());
-          if (verbose) std::cout << "Rejected Kplus" << std::endl;
-          continue;
+        if (pdg == 321) {
+          particlesByPDG[pdg].erase(
+              std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
+                             [&](auto&& p) { return !selectors::Kplus(p, inbending, reference_vertex); }),
+              particlesByPDG[pdg].end());
         }
-        if (pdg == -321 && !selectors::Kminus(p, inbending, reference_vertex)) {
-          particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
-                                    particlesByPDG[pdg].end());
-          if (verbose) std::cout << "Rejected Kminus" << std::endl;
-          continue;
+        if (pdg == -321) {
+          particlesByPDG[pdg].erase(
+              std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
+                             [&](auto&& p) { return !selectors::Kminus(p, inbending, reference_vertex); }),
+              particlesByPDG[pdg].end());
         }
-        if (pdg == 22 && !selectors::photon(p, inbending)) {
-          particlesByPDG[pdg].erase(std::remove(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(), p),
+        if (pdg == 22) {
+          particlesByPDG[pdg].erase(std::remove_if(particlesByPDG[pdg].begin(), particlesByPDG[pdg].end(),
+                                                   [&](auto&& p) { return !selectors::photon(p, inbending); }),
                                     particlesByPDG[pdg].end());
-          if (verbose) std::cout << "Rejected photon" << std::endl;
-          continue;
         }
 
         std::string name = pdg_name(p->getPid());
