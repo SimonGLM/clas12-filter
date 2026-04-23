@@ -150,6 +150,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", bool i
   // Event loop
   //////////////////////////////////////////////////////////////////////////////
   int count = 0;
+  size_t particle_count = 0;
   uint progressInterval = 1;
   auto t0 = steady_clock::now();
   uint last_count = 0;
@@ -319,6 +320,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", bool i
 
         std::string name = pdg_name(p->getPid());
         if (verbose) std::cout << std::format("Valid {} found!", name) << std::endl;
+        particle_count++;
 
         // --------------------------- 3.2 ---------------------------
         // ===========================================================
@@ -378,7 +380,7 @@ void new_filter(std::string inFile, std::string outputfile = "/dev/null", bool i
     // =========================== 4. ===========================
     file->Fill();
   }
-  fmt::print("Processed a total of {} events in {:.1f} seconds.\n", count,
+  fmt::print("Processed a total of {} events with {} particles in {:.1f} seconds.\n", count, particle_count,
              duration_cast<milliseconds>(steady_clock::now() - t0).count() / 1000.);
 
   StatisticsCollector::print_hierarchical_statistics();
